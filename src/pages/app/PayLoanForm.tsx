@@ -53,24 +53,26 @@ export function PayLoanForm({ loan, onSubmitted }: { loan: Loan; onSubmitted: ()
       return;
     }
 
-    // Traer nombre y cédula del KYC aprobado para incluirlos en el aviso.
+    // Traer nombre, cédula y WhatsApp del KYC aprobado para incluirlos en el aviso.
     const { data: kycData } = await supabase
       .from("kyc")
-      .select("full_name, document_id")
+      .select("full_name, document_id, whatsapp_number")
       .eq("user_id", loan.user_id)
       .eq("status", "aprobado")
       .order("reviewed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const kyc = kycData as { full_name: string; document_id: string } | null;
+    const kyc = kycData as { full_name: string; document_id: string; whatsapp_number: string } | null;
 
     notifyTelegram(
       `💰 <b>Nuevo pago registrado</b>\n` +
         `Nombre: ${kyc?.full_name ?? "desconocido"}\n` +
         `Cédula: ${kyc?.document_id ?? "desconocida"}\n` +
+        `WhatsApp: ${kyc?.whatsapp_number ?? "—"}\n` +
         `Usuario: ${session?.user.email ?? "desconocido"}\n` +
         `Préstamo: ${loan.public_id}\n` +
-        `Monto: ${formatMoney(Number(amount))}${rate ? ` (${formatBs(Number(amount), rate)})` : ""}\n` +
+        `Monto pagado: ${formatMoney(Number(amount))}${rate ? ` (${formatBs(Number(amount), rate)})` : ""}\n` +
+        `Banco desde donde pagó: ${bank}\n` +
         `Referencia: ${reference.trim()}`
     );
     setSent(true);

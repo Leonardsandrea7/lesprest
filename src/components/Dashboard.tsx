@@ -12,7 +12,7 @@ export function Dashboard() {
   const rate = useExchangeRate();
   const { canInstall, isStandalone, promptInstall } = useInstallPrompt();
 
-  const firstName = kyc?.full_name?.split(" ")[0] ?? profile?.full_name?.split(" ")[0] ?? null;
+  const firstName = profile?.full_name?.split(" ")[0] ?? "de nuevo";
 
   if (loading) {
     return <div className="py-10 text-center text-sm text-[var(--muted)]">Cargando tu cuenta...</div>;
@@ -32,10 +32,8 @@ export function Dashboard() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm text-[var(--muted)]">Bienvenido de nuevo</p>
-        <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">
-          {firstName ? `Hola, ${firstName}` : "Hola de nuevo"}
-        </h1>
+        <p className="text-sm text-[var(--muted)]">Hola,</p>
+        <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">{firstName}</h1>
       </div>
 
       {!isStandalone && canInstall && (
@@ -140,7 +138,7 @@ function kycLabel(status: string) {
 
 function StatusPill({ ok, okText, pendingText }: { ok: boolean; okText: string; pendingText: string }) {
   return ok ? (
-    <span className="text-sm font-semibold text-[var(--brand)]">✓ {okText}</span>
+    <span className="text-sm font-semibold text-[var(--success)]">✓ {okText}</span>
   ) : (
     <span className="text-sm font-medium text-[var(--muted)]">{pendingText}</span>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Logo } from "../components/Logo";
 import { Button } from "../components/ui";
 
 export function Download() {
@@ -25,7 +26,7 @@ export function Download() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--paper)] px-6 text-center">
-      <Link to="/" className="font-display text-lg font-semibold text-[var(--ink)]">LES PREST</Link>
+      <Link to="/"><Logo size="sm" /></Link>
       <h1 className="mt-8 font-display text-3xl font-semibold text-[var(--ink)]">LES PREST siempre contigo</h1>
       <p className="mt-3 max-w-sm text-[15px] text-[var(--muted)]">
         Administra tus préstamos desde tu teléfono de forma rápida y sencilla.

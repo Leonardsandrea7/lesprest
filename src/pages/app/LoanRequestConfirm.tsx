@@ -29,24 +29,40 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
       return;
     }
 
-    const { data: kycData } = await supabase
-      .from("kyc")
-      .select("full_name, document_id")
-      .eq("user_id", session?.user.id ?? "")
-      .eq("status", "aprobado")
-      .order("reviewed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const kyc = kycData as { full_name: string; document_id: string } | null;
+    const [{ data: kycData }, { data: upmData }] = await Promise.all([
+      supabase
+        .from("kyc")
+        .select("full_name, document_id, whatsapp_number")
+        .eq("user_id", session?.user.id ?? "")
+        .eq("status", "aprobado")
+        .order("reviewed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("user_payment_methods")
+        .select("bank, holder_name, document_id, phone")
+        .eq("user_id", session?.user.id ?? "")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const kyc = kycData as { full_name: string; document_id: string; whatsapp_number: string } | null;
+    const upm = upmData as { bank: string; holder_name: string; document_id: string; phone: string } | null;
 
     notifyTelegram(
       `🆕 <b>Nueva solicitud de préstamo</b>\n` +
         `Nombre: ${kyc?.full_name ?? "desconocido"}\n` +
         `Cédula: ${kyc?.document_id ?? "desconocida"}\n` +
+        `WhatsApp: ${kyc?.whatsapp_number ?? "—"}\n` +
         `Usuario: ${session?.user.email ?? "desconocido"}\n` +
         `Nivel: ${level.level_number}\n` +
-        `Monto: ${formatMoney(level.principal_amount)}${rate ? ` (${formatBs(level.principal_amount, rate)})` : ""}\n` +
-        `ID: ${(loan as { public_id?: string } | null)?.public_id ?? ""}`
+        `Monto a desembolsar: ${formatMoney(level.principal_amount)}${rate ? ` (${formatBs(level.principal_amount, rate)})` : ""}\n` +
+        `ID: ${(loan as { public_id?: string } | null)?.public_id ?? ""}\n\n` +
+        `<b>Datos de Pago Móvil para el desembolso:</b>\n` +
+        `Banco: ${upm?.bank ?? "—"}\n` +
+        `Titular: ${upm?.holder_name ?? "—"}\n` +
+        `Documento: ${upm?.document_id ?? "—"}\n` +
+        `Teléfono: ${upm?.phone ?? "—"}`
     );
     onRequested();
   }
@@ -58,8 +74,6 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
       {rate && <p className="text-sm text-[var(--muted)] tabular">{formatBs(level.principal_amount, rate)}</p>}
 
       <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
-        <Row label="Retorno" value={`${level.return_rate_percent}%`} />
-        <Row label="Ganancia" value={formatMoney(returnAmount)} sub={rate ? formatBs(returnAmount, rate) : undefined} />
         <Row label="Total a devolver" value={formatMoney(total)} sub={rate ? formatBs(total, rate) : undefined} strong />
         <Row label="Plazo" value={`${level.term_days} días`} />
         <Row label="Fecha estimada de vencimiento" value={estimatedDue} />

@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { Logo } from "../../components/Logo";
 
 const links = [
   { to: "/admin", label: "Resumen", end: true },
@@ -26,8 +27,8 @@ export function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-[var(--paper)]">
       <aside className="hidden w-60 shrink-0 border-r border-[var(--line)] bg-[var(--paper-raised)] p-5 md:block">
-        <p className="font-display text-lg font-semibold text-[var(--ink)]">LES PREST</p>
-        <p className="text-xs text-[var(--muted)]">Panel administrativo</p>
+        <Logo size="sm" />
+        <p className="mt-1 text-xs text-[var(--muted)]">Panel administrativo</p>
         <nav className="mt-6 space-y-1">
           {links.map((l) => (
             <NavLink
@@ -51,7 +52,7 @@ export function AdminLayout() {
 
       {/* Nav móvil simple */}
       <div className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 md:hidden">
-        <span className="font-display font-semibold text-[var(--ink)]">LES PREST Admin</span>
+        <Logo size="sm" />
         <button onClick={handleSignOut} className="text-sm font-medium text-[var(--muted)]">Salir</button>
       </div>
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
+import { Logo } from "./Logo";
 
 export function InstallGate({ children }: { children: ReactNode }) {
   const { canInstall, isStandalone, isIOS, promptInstall } = useInstallPrompt();
@@ -8,7 +9,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--paper)] px-6 text-center">
-      <span className="font-display text-xl font-semibold text-[var(--ink)]">LES PREST</span>
+      <Logo size="lg" withText={false} />
       <h1 className="mt-8 font-display text-2xl font-semibold text-[var(--ink)]">Instala la app para continuar</h1>
       <p className="mt-3 max-w-sm text-[15px] text-[var(--muted)]">
         LES PREST solo funciona como aplicación instalada. Instálala para acceder a tu cuenta.

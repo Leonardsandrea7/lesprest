@@ -140,7 +140,7 @@ function kycLabel(status: string) {
 
 function StatusPill({ ok, okText, pendingText }: { ok: boolean; okText: string; pendingText: string }) {
   return ok ? (
-    <span className="text-sm font-semibold text-[var(--brand)]">✓ {okText}</span>
+    <span className="text-sm font-semibold text-[var(--success)]">✓ {okText}</span>
   ) : (
     <span className="text-sm font-medium text-[var(--muted)]">{pendingText}</span>
   );

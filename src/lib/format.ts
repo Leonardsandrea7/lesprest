@@ -44,9 +44,9 @@ export const loanStatusColors: Record<LoanStatus, string> = {
   en_revision: "bg-amber-100 text-amber-800",
   aprobado: "bg-sky-100 text-sky-800",
   pendiente_desembolso: "bg-sky-100 text-sky-800",
-  activo: "bg-emerald-100 text-emerald-800",
+  activo: "bg-blue-100 text-blue-800",
   pendiente_pago: "bg-amber-100 text-amber-800",
-  pagado: "bg-emerald-100 text-emerald-800",
+  pagado: "bg-blue-100 text-blue-800",
   vencido: "bg-red-100 text-red-800",
   rechazado: "bg-red-100 text-red-800",
 };

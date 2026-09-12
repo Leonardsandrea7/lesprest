@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Logo } from "../../components/Logo";
 import { supabase } from "../../lib/supabase";
 import { Button, Field, Input, Alert } from "../../components/ui";
 
@@ -31,7 +32,7 @@ export function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] px-6 py-10">
       <div className="w-full max-w-sm">
-        <Link to="/" className="font-display text-lg font-semibold text-[var(--ink)]">LES PREST</Link>
+        <Link to="/"><Logo size="sm" /></Link>
         <h1 className="mt-6 font-display text-2xl font-semibold text-[var(--ink)]">Inicia sesión</h1>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">

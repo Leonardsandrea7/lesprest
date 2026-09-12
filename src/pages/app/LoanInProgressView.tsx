@@ -14,9 +14,8 @@ export function LoanInProgressView({ loan, onPaid }: { loan: Loan; onPaid: () =>
           <Badge className={loanStatusColors[loan.status]}>{loanStatusLabels[loan.status]}</Badge>
         </div>
         <dl className="mt-4 space-y-2 text-sm">
-          <Row label="Capital" value={formatMoney(loan.principal_amount)} />
-          <Row label="Retorno" value={formatMoney(loan.return_amount)} />
-          <Row label="Total" value={formatMoney(loan.total_amount)} />
+          <Row label="Préstamo" value={formatMoney(loan.principal_amount)} />
+          <Row label="Total a devolver" value={formatMoney(loan.total_amount)} />
           <Row label="Pendiente" value={formatMoney(pending)} strong />
           {loan.due_at && <Row label="Vencimiento" value={formatDate(loan.due_at)} />}
         </dl>

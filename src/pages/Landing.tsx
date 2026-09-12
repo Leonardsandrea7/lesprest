@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Logo } from "../components/Logo";
 
 const steps = [
   { n: 1, text: "Regístrate con tu correo." },
@@ -15,7 +16,7 @@ export function Landing() {
   return (
     <div className="min-h-screen bg-[var(--paper)]">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <span className="font-display text-xl font-semibold text-[var(--ink)]">LES PREST</span>
+        <Logo />
         <div className="flex gap-3">
           <Link to="/login" className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-black/5">
             Iniciar sesión
