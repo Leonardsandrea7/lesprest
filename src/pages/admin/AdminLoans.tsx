@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { Card, Badge, Button, EmptyState, Field, Input } from "../../components/ui";
 import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
+import { playSuccessSound } from "../../lib/sound";
 import type { Loan, UserPaymentMethod } from "../../lib/database.types";
 
 interface LoanRow extends Loan {
@@ -28,6 +29,7 @@ export function AdminLoans() {
     const reason = decision === "rechazar" ? window.prompt("Motivo del rechazo:") ?? undefined : undefined;
     const { error } = await supabase.rpc("admin_review_loan", { p_loan_id: loan.id, p_decision: decision, p_reason: reason });
     if (error) return alert(error.message);
+    if (decision === "aprobar") playSuccessSound();
     load();
   }
 

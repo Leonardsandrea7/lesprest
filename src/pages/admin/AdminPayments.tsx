@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { Card, Badge, Button, EmptyState } from "../../components/ui";
 import { formatMoney, formatDate, paymentStatusLabels } from "../../lib/format";
+import { playSuccessSound } from "../../lib/sound";
 import type { LoanPayment } from "../../lib/database.types";
 
 const statusColors: Record<string, string> = {
@@ -37,6 +38,7 @@ export function AdminPayments() {
     const reason = decision === "rechazar" ? window.prompt("Motivo del rechazo:") ?? undefined : undefined;
     const { error } = await supabase.rpc("admin_review_payment", { p_payment_id: payment.id, p_decision: decision, p_reason: reason });
     if (error) return alert(error.message);
+    if (decision === "aprobar") playSuccessSound();
     load();
   }
 

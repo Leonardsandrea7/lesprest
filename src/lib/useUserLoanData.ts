@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { playSuccessSound } from "./sound";
 import type {
   Kyc,
   Loan,
@@ -118,7 +119,21 @@ export function useUserLoanData(): UserLoanData {
       .channel(`loans-changes-${profile.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "loans", filter: `user_id=eq.${profile.id}` },
+        { event: "UPDATE", schema: "public", table: "loans", filter: `user_id=eq.${profile.id}` },
+        (payload) => {
+          const oldStatus = (payload.old as { status?: string } | null)?.status;
+          const newStatus = (payload.new as { status?: string } | null)?.status;
+          // Suena cuando el préstamo pasa a "activo" (aprobado y
+          // desembolsado) o queda "pagado" tras confirmar un pago.
+          if (oldStatus !== newStatus && (newStatus === "activo" || newStatus === "pagado")) {
+            playSuccessSound();
+          }
+          refresh();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "loans", filter: `user_id=eq.${profile.id}` },
         () => refresh()
       )
       .on(
