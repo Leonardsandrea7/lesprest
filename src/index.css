@@ -1,24 +1,25 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /* =====================================================================
-   LES PREST — Tokens de marca
-   Paleta: verde petróleo profundo (confianza/estabilidad financiera),
-   papel cálido grisáceo (no el crema genérico de IA), ámbar solo para
-   momentos de "logro" (barra de progreso, nivel desbloqueado).
+   LES PREST — Identidad tipo banco digital / billetera
+   Azul profundo (confianza bancaria) + blanco limpio, verde para
+   movimientos positivos, rojo contenido para alertas. Tarjeta de saldo
+   como elemento protagonista, todo lo demás queda discreto alrededor.
    ===================================================================== */
 :root {
-  --ink: #0f2e2c;          /* texto principal, headlines */
-  --paper: #f6f4ee;        /* fondo base */
+  --ink: #16233f;          /* texto principal — azul-negro, no negro puro */
+  --paper: #f4f6fa;        /* fondo base — blanco azulado, no crema */
   --paper-raised: #ffffff; /* tarjetas */
-  --brand: #0b6e5c;        /* verde LES PREST — acciones primarias */
-  --brand-dark: #084d40;
-  --gold: #c98a3b;         /* logro / progreso — uso restringido */
-  --brick: #a83b2e;        /* errores / rechazos */
-  --line: #ddd7c7;         /* bordes hairline */
-  --muted: #6b7570;
+  --brand: #0a6cf5;        /* azul de acción — botones, links, activo */
+  --brand-dark: #0b2f6b;   /* azul profundo — tarjeta de saldo, headers */
+  --gold: #d99a2b;         /* logro / progreso de nivel — uso restringido */
+  --success: #16a34a;      /* montos positivos, confirmaciones */
+  --brick: #c0362c;        /* errores / rechazos */
+  --line: #e2e6ee;         /* bordes hairline */
+  --muted: #6b7280;
 
-  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-display: "Manrope", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
 
   font-family: var(--font-body);
@@ -37,9 +38,10 @@ h1, h2, h3, .font-display {
 
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* Un solo momento de sombra reservado para la tarjeta de préstamo activo */
-.shadow-hero {
-  box-shadow: 0 12px 32px -12px rgba(15, 46, 44, 0.25);
+/* Tarjeta de saldo (billetera) — el único momento "grande" de la interfaz */
+.balance-card {
+  background: linear-gradient(135deg, var(--brand-dark) 0%, #12408f 100%);
+  box-shadow: 0 16px 32px -14px rgba(11, 47, 107, 0.45);
 }
 
-::selection { background: var(--gold); color: var(--ink); }
+::selection { background: var(--brand); color: white; }

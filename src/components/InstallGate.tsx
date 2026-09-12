@@ -24,7 +24,6 @@ function isIOS(): boolean {
 export function InstallGate({ children }: { children: ReactNode }) {
   const [standalone, setStandalone] = useState(isStandalone());
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [bypass, setBypass] = useState(() => localStorage.getItem("lp_install_bypass") === "1");
 
   useEffect(() => {
     function handler(e: Event) {
@@ -36,7 +35,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (standalone || bypass) return <>{children}</>;
+  if (standalone) return <>{children}</>;
 
   async function install() {
     if (!deferredPrompt) return;
@@ -46,17 +45,12 @@ export function InstallGate({ children }: { children: ReactNode }) {
     setDeferredPrompt(null);
   }
 
-  function continueInBrowser() {
-    localStorage.setItem("lp_install_bypass", "1");
-    setBypass(true);
-  }
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--paper)] px-6 text-center">
       <span className="font-display text-xl font-semibold text-[var(--ink)]">LES PREST</span>
       <h1 className="mt-8 font-display text-2xl font-semibold text-[var(--ink)]">Instala la app para continuar</h1>
       <p className="mt-3 max-w-sm text-[15px] text-[var(--muted)]">
-        LES PREST funciona como aplicación instalada en tu teléfono para darte una mejor experiencia y avisarte de tus préstamos.
+        LES PREST solo funciona como aplicación instalada. Instálala para acceder a tu cuenta.
       </p>
 
       {isIOS() ? (
@@ -80,10 +74,6 @@ export function InstallGate({ children }: { children: ReactNode }) {
           <p>Desde el menú de tu navegador, elige "Agregar a pantalla de inicio" o "Instalar aplicación".</p>
         </div>
       )}
-
-      <button onClick={continueInBrowser} className="mt-10 text-xs text-[var(--muted)] underline">
-        Tuve un problema al instalar, continuar en el navegador
-      </button>
     </div>
   );
 }

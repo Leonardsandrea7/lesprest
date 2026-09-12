@@ -35,26 +35,25 @@ export function Dashboard() {
       </div>
 
       {currentLevel && (
-        <Card className="shadow-hero">
+        <div className="balance-card rounded-3xl p-6 text-white">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[var(--muted)]">Tu nivel</span>
-            <Badge className="bg-[var(--brand)]/10 text-[var(--brand)]">Nivel {currentLevel.level_number}</Badge>
+            <span className="text-sm font-medium text-white/70">Crédito disponible</span>
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">Nivel {currentLevel.level_number}</span>
           </div>
-          <p className="mt-3 font-display text-3xl font-semibold text-[var(--ink)] tabular">
+          <p className="mt-4 font-display text-4xl font-extrabold tabular">
             {formatMoney(currentLevel.principal_amount)}
           </p>
-          {rate ? <p className="text-sm text-[var(--muted)] tabular">{formatBs(currentLevel.principal_amount, rate)}</p> : null}
-          <p className="text-sm text-[var(--muted)]">Crédito disponible</p>
+          {rate ? <p className="mt-1 text-sm text-white/70 tabular">{formatBs(currentLevel.principal_amount, rate)}</p> : null}
 
           {!activeLoan && (
             <Link
               to="/app/prestamo"
-              className="mt-4 block rounded-xl bg-[var(--brand)] py-3 text-center text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]"
+              className="mt-6 block rounded-xl bg-white py-3 text-center text-[15px] font-semibold text-[var(--brand-dark)] hover:bg-white/90"
             >
               Solicitar préstamo
             </Link>
           )}
-        </Card>
+        </div>
       )}
 
       {activeLoan && (
@@ -128,7 +127,7 @@ function kycLabel(status: string) {
 
 function StatusPill({ ok, okText, pendingText }: { ok: boolean; okText: string; pendingText: string }) {
   return ok ? (
-    <span className="text-sm font-semibold text-[var(--brand)]">✓ {okText}</span>
+    <span className="text-sm font-semibold text-[var(--success)]">✓ {okText}</span>
   ) : (
     <span className="text-sm font-medium text-[var(--muted)]">{pendingText}</span>
   );
