@@ -1,0 +1,74 @@
+import { useState } from "react";
+import { supabase } from "../../lib/supabase";
+import { notifyTelegram } from "../../lib/telegram";
+import { Button, Card, Alert } from "../../components/ui";
+import { formatMoney, formatBs } from "../../lib/format";
+import { useExchangeRate } from "../../lib/useExchangeRate";
+import { useAuth } from "../../context/AuthContext";
+import type { LoanLevel } from "../../lib/database.types";
+import { addDays, format } from "date-fns";
+import { es } from "date-fns/locale";
+
+export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; onRequested: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const rate = useExchangeRate();
+  const { session } = useAuth();
+
+  const returnAmount = Math.round(level.principal_amount * (level.return_rate_percent / 100) * 100) / 100;
+  const total = level.principal_amount + returnAmount;
+  const estimatedDue = format(addDays(new Date(), level.term_days), "dd 'de' MMMM", { locale: es });
+
+  async function handleConfirm() {
+    setLoading(true);
+    setError(null);
+    const { data: loan, error: rpcError } = await supabase.rpc("request_loan");
+    setLoading(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    notifyTelegram(
+      `🆕 <b>Nueva solicitud de préstamo</b>\n` +
+        `Usuario: ${session?.user.email ?? "desconocido"}\n` +
+        `Nivel: ${level.level_number}\n` +
+        `Monto: ${formatMoney(level.principal_amount)}${rate ? ` (${formatBs(level.principal_amount, rate)})` : ""}\n` +
+        `ID: ${(loan as { public_id?: string } | null)?.public_id ?? ""}`
+    );
+    onRequested();
+  }
+
+  return (
+    <Card>
+      <p className="text-sm font-medium text-[var(--muted)]">Nivel {level.level_number}</p>
+      <p className="mt-1 font-display text-3xl font-semibold text-[var(--ink)] tabular">{formatMoney(level.principal_amount)}</p>
+      {rate && <p className="text-sm text-[var(--muted)] tabular">{formatBs(level.principal_amount, rate)}</p>}
+
+      <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
+        <Row label="Retorno" value={`${level.return_rate_percent}%`} />
+        <Row label="Ganancia" value={formatMoney(returnAmount)} sub={rate ? formatBs(returnAmount, rate) : undefined} />
+        <Row label="Total a devolver" value={formatMoney(total)} sub={rate ? formatBs(total, rate) : undefined} strong />
+        <Row label="Plazo" value={`${level.term_days} días`} />
+        <Row label="Fecha estimada de vencimiento" value={estimatedDue} />
+      </dl>
+
+      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
+
+      <Button onClick={handleConfirm} disabled={loading} className="mt-5 w-full">
+        {loading ? "Enviando solicitud..." : "Confirmar solicitud"}
+      </Button>
+    </Card>
+  );
+}
+
+function Row({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className="text-[var(--muted)]">{label}</dt>
+      <dd className="text-right">
+        <div className={`tabular ${strong ? "font-display text-base font-semibold text-[var(--ink)]" : "text-[var(--ink)]"}`}>{value}</div>
+        {sub && <div className="text-xs text-[var(--muted)] tabular">{sub}</div>}
+      </dd>
+    </div>
+  );
+}

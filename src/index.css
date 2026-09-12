@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* =====================================================================
+   LES PREST — Tokens de marca
+   Paleta: verde petróleo profundo (confianza/estabilidad financiera),
+   papel cálido grisáceo (no el crema genérico de IA), ámbar solo para
+   momentos de "logro" (barra de progreso, nivel desbloqueado).
+   ===================================================================== */
+:root {
+  --ink: #0f2e2c;          /* texto principal, headlines */
+  --paper: #f6f4ee;        /* fondo base */
+  --paper-raised: #ffffff; /* tarjetas */
+  --brand: #0b6e5c;        /* verde LES PREST — acciones primarias */
+  --brand-dark: #084d40;
+  --gold: #c98a3b;         /* logro / progreso — uso restringido */
+  --brick: #a83b2e;        /* errores / rechazos */
+  --line: #ddd7c7;         /* bordes hairline */
+  --muted: #6b7570;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Un solo momento de sombra reservado para la tarjeta de préstamo activo */
+.shadow-hero {
+  box-shadow: 0 12px 32px -12px rgba(15, 46, 44, 0.25);
+}
+
+::selection { background: var(--gold); color: var(--ink); }
