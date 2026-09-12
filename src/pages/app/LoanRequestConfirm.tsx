@@ -28,8 +28,21 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
       setError(rpcError.message);
       return;
     }
+
+    const { data: kycData } = await supabase
+      .from("kyc")
+      .select("full_name, document_id")
+      .eq("user_id", session?.user.id ?? "")
+      .eq("status", "aprobado")
+      .order("reviewed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const kyc = kycData as { full_name: string; document_id: string } | null;
+
     notifyTelegram(
       `🆕 <b>Nueva solicitud de préstamo</b>\n` +
+        `Nombre: ${kyc?.full_name ?? "desconocido"}\n` +
+        `Cédula: ${kyc?.document_id ?? "desconocida"}\n` +
         `Usuario: ${session?.user.email ?? "desconocido"}\n` +
         `Nivel: ${level.level_number}\n` +
         `Monto: ${formatMoney(level.principal_amount)}${rate ? ` (${formatBs(level.principal_amount, rate)})` : ""}\n` +

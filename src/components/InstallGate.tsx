@@ -15,7 +15,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
       </p>
 
       {isIOS ? (
-        <div className="mt-8 max-w-xs rounded-2xl border border-[var(--line)] bg-white p-5 text-left text-sm text-[var(--ink)]">
+        <div className="mt-8 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 text-left text-sm text-[var(--ink)]">
           <p className="font-semibold">En iPhone:</p>
           <ol className="mt-2 list-decimal space-y-1 pl-5">
             <li>Toca el botón "Compartir" (el cuadrado con la flecha) en Safari.</li>
@@ -31,7 +31,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
           Instalar aplicación
         </button>
       ) : (
-        <div className="mt-8 max-w-xs rounded-2xl border border-[var(--line)] bg-white p-5 text-left text-sm text-[var(--ink)]">
+        <div className="mt-8 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 text-left text-sm text-[var(--ink)]">
           <p>Desde el menú de tu navegador, elige "Agregar a pantalla de inicio" o "Instalar aplicación".</p>
         </div>
       )}

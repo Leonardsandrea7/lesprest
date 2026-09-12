@@ -90,9 +90,24 @@ export function AdminLoans() {
                   {loan.status === "aprobado" && (
                     <div className="space-y-3 rounded-xl bg-black/[0.03] p-4">
                       <p className="font-medium text-[var(--ink)]">Registrar desembolso manual</p>
+                      {rate && (
+                        <div className="rounded-lg bg-[var(--brand)]/10 px-3 py-2 text-sm">
+                          <p className="font-semibold text-[var(--brand)]">
+                            Transferir por Pago Móvil: {formatBs(loan.principal_amount, rate)}
+                          </p>
+                          <p className="text-xs text-[var(--muted)]">
+                            Equivale a {formatMoney(loan.principal_amount)} al tipo de cambio actual.
+                          </p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-3">
-                        <Field label="Monto enviado">
-                          <Input type="number" step="0.01" onChange={(e) => updateDisb(loan.id, "amount", e.target.value)} />
+                        <Field label="Monto enviado (Bs.)">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={disbForm[loan.id]?.amount ?? (rate ? (loan.principal_amount * rate).toFixed(2) : "")}
+                            onChange={(e) => updateDisb(loan.id, "amount", e.target.value)}
+                          />
                         </Field>
                         <Field label="Banco utilizado">
                           <Input onChange={(e) => updateDisb(loan.id, "bank", e.target.value)} />

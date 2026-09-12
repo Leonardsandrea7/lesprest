@@ -7,17 +7,23 @@
    movimientos positivos, rojo contenido para alertas. Tarjeta de saldo
    como elemento protagonista, todo lo demás queda discreto alrededor.
    ===================================================================== */
+/* =====================================================================
+   LES PREST — Identidad tipo banco digital, modo oscuro
+   Fondo azul-negro profundo, tarjetas ligeramente más claras, azul
+   brillante como acento (mejor contraste sobre fondo oscuro), verde
+   para movimientos positivos, rojo suave para alertas.
+   ===================================================================== */
 :root {
-  --ink: #16233f;          /* texto principal — azul-negro, no negro puro */
-  --paper: #f4f6fa;        /* fondo base — blanco azulado, no crema */
-  --paper-raised: #ffffff; /* tarjetas */
-  --brand: #0a6cf5;        /* azul de acción — botones, links, activo */
-  --brand-dark: #0b2f6b;   /* azul profundo — tarjeta de saldo, headers */
-  --gold: #d99a2b;         /* logro / progreso de nivel — uso restringido */
-  --success: #16a34a;      /* montos positivos, confirmaciones */
-  --brick: #c0362c;        /* errores / rechazos */
-  --line: #e2e6ee;         /* bordes hairline */
-  --muted: #6b7280;
+  --ink: #e9edf6;          /* texto principal — casi blanco, tinte azulado */
+  --paper: #0b1220;        /* fondo base — azul-negro profundo */
+  --paper-raised: #141d31; /* tarjetas */
+  --brand: #3b82f6;        /* azul de acción — más brillante para contraste en oscuro */
+  --brand-dark: #12408f;   /* azul profundo — tarjeta de saldo, headers */
+  --gold: #e3a83e;         /* logro / progreso de nivel — uso restringido */
+  --success: #22c55e;      /* montos positivos, confirmaciones */
+  --brick: #ef4444;        /* errores / rechazos */
+  --line: #232d45;         /* bordes hairline */
+  --muted: #93a0b8;
 
   --font-display: "Manrope", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;

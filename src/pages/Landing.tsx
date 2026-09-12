@@ -39,7 +39,7 @@ export function Landing() {
             <Link to="/registro" className="rounded-xl bg-[var(--brand)] px-6 py-3.5 text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]">
               Solicitar mi préstamo
             </Link>
-            <Link to="/descargar" className="rounded-xl border border-[var(--line)] bg-white px-6 py-3.5 text-[15px] font-semibold text-[var(--ink)] hover:border-[var(--brand)]">
+            <Link to="/descargar" className="rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-6 py-3.5 text-[15px] font-semibold text-[var(--ink)] hover:border-[var(--brand)]">
               Instalar LES PREST
             </Link>
           </div>
@@ -60,7 +60,7 @@ export function Landing() {
       </section>
 
       {/* Cómo funciona */}
-      <section className="border-t border-[var(--line)] bg-white py-16">
+      <section className="border-t border-[var(--line)] bg-[var(--paper-raised)] py-16">
         <div className="mx-auto max-w-5xl px-6">
           <h2 className="font-display text-2xl font-semibold text-[var(--ink)]">Cómo funciona</h2>
           <ol className="mt-8 grid gap-5 sm:grid-cols-2 md:grid-cols-3">

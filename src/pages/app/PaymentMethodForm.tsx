@@ -46,7 +46,7 @@ export function PaymentMethodForm({ onDone }: { onDone: () => void }) {
             required
             value={form.bank}
             onChange={(e) => update("bank", e.target.value)}
-            className="w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
+            className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
           >
             {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>

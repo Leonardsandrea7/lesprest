@@ -4,13 +4,15 @@ import { useUserLoanData } from "../../lib/useUserLoanData";
 import { Card, Badge, ProgressBar } from "../../components/ui";
 import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors, daysRemaining } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
+import { useInstallPrompt } from "../../lib/useInstallPrompt";
 
 export function Dashboard() {
   const { profile } = useAuth();
   const { loading, error, currentLevel, kyc, paymentMethod, activeLoan, refresh } = useUserLoanData();
   const rate = useExchangeRate();
+  const { canInstall, isStandalone, promptInstall } = useInstallPrompt();
 
-  const firstName = profile?.full_name?.split(" ")[0] ?? "de nuevo";
+  const firstName = kyc?.full_name?.split(" ")[0] ?? profile?.full_name?.split(" ")[0] ?? null;
 
   if (loading) {
     return <div className="py-10 text-center text-sm text-[var(--muted)]">Cargando tu cuenta...</div>;
@@ -30,9 +32,20 @@ export function Dashboard() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm text-[var(--muted)]">Hola,</p>
-        <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">{firstName}</h1>
+        <p className="text-sm text-[var(--muted)]">Bienvenido de nuevo</p>
+        <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">
+          {firstName ? `Hola, ${firstName}` : "Hola de nuevo"}
+        </h1>
       </div>
+
+      {!isStandalone && canInstall && (
+        <button
+          onClick={promptInstall}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand)] py-3 text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]"
+        >
+          ⬇ Instalar la app LES PREST
+        </button>
+      )}
 
       {currentLevel && (
         <div className="balance-card rounded-3xl p-6 text-white">

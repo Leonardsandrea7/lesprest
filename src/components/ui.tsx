@@ -9,7 +9,7 @@ export function Button({
   const base = "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none";
   const styles: Record<string, string> = {
     primary: "bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)]",
-    secondary: "bg-white text-[var(--ink)] border border-[var(--line)] hover:border-[var(--brand)]",
+    secondary: "bg-[var(--paper-raised)] text-[var(--ink)] border border-[var(--line)] hover:border-[var(--brand)]",
     ghost: "text-[var(--brand)] hover:bg-[var(--brand)]/10",
     danger: "bg-[var(--brick)] text-white hover:opacity-90",
   };
@@ -58,7 +58,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
+      className={`w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
     />
   );
 }
@@ -67,7 +67,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
+      className={`w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
     />
   );
 }
@@ -76,7 +76,7 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return (
     <textarea
       {...props}
-      className={`w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
+      className={`w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 ${props.className ?? ""}`}
     />
   );
 }

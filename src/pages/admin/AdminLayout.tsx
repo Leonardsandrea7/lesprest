@@ -25,7 +25,7 @@ export function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-[var(--paper)]">
-      <aside className="hidden w-60 shrink-0 border-r border-[var(--line)] bg-white p-5 md:block">
+      <aside className="hidden w-60 shrink-0 border-r border-[var(--line)] bg-[var(--paper-raised)] p-5 md:block">
         <p className="font-display text-lg font-semibold text-[var(--ink)]">LES PREST</p>
         <p className="text-xs text-[var(--muted)]">Panel administrativo</p>
         <nav className="mt-6 space-y-1">
@@ -50,7 +50,7 @@ export function AdminLayout() {
       </aside>
 
       {/* Nav móvil simple */}
-      <div className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-white px-4 py-3 md:hidden">
+      <div className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 md:hidden">
         <span className="font-display font-semibold text-[var(--ink)]">LES PREST Admin</span>
         <button onClick={handleSignOut} className="text-sm font-medium text-[var(--muted)]">Salir</button>
       </div>

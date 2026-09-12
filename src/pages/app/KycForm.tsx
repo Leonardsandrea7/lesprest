@@ -61,7 +61,7 @@ export function KycForm({ onDone }: { onDone: () => void }) {
             required
             value={form.state}
             onChange={(e) => update("state", e.target.value)}
-            className="w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
+            className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
           >
             {VENEZUELA_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
