@@ -12,7 +12,8 @@ const statusColors: Record<string, string> = {
 };
 
 interface PaymentRow extends LoanPayment {
-  loans?: { public_id: string };
+  loans?: { public_id: string; installments_count: number };
+  loan_installments?: { installment_number: number };
 }
 
 export function AdminPayments() {
@@ -22,7 +23,7 @@ export function AdminPayments() {
   async function load() {
     let query = supabase
       .from("loan_payments")
-      .select("*, loans(public_id)")
+      .select("*, loans(public_id, installments_count), loan_installments(installment_number)")
       .order("created_at", { ascending: false });
     if (filter === "pendiente_verificacion") query = query.eq("status", "pendiente_verificacion");
     const { data } = await query;
@@ -60,7 +61,10 @@ export function AdminPayments() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-[var(--ink)] tabular">{formatMoney(p.amount)} · {p.loans?.public_id}</p>
-                <p className="text-xs text-[var(--muted)]">Ref. {p.reference_number} · {p.bank} · {formatDate(p.payment_date)}</p>
+                <p className="text-xs text-[var(--muted)]">
+                  Ref. {p.reference_number} · {p.bank} · {formatDate(p.payment_date)}
+                  {p.loan_installments && ` · Cuota ${p.loan_installments.installment_number} de ${p.loans?.installments_count}`}
+                </p>
               </div>
               <Badge className={statusColors[p.status]}>{paymentStatusLabels[p.status]}</Badge>
             </div>

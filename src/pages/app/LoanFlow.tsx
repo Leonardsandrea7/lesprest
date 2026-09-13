@@ -27,7 +27,7 @@ export function LoanFlow() {
 
   // 1) Préstamo en curso: mostrarlo siempre primero, sin importar el resto.
   if (data.activeLoan) {
-    return <LoanInProgressView loan={data.activeLoan} onPaid={data.refresh} />;
+    return <LoanInProgressView loan={data.activeLoan} installments={data.activeLoanInstallments} onPaid={data.refresh} />;
   }
 
   // 2) KYC no iniciado

@@ -65,6 +65,20 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
   rechazado: "Rechazado",
 };
 
+export const installmentStatusLabels: Record<string, string> = {
+  pendiente: "Pendiente",
+  pendiente_pago: "Pendiente de verificación",
+  pagada: "Pagada",
+  vencida: "Vencida",
+};
+
+export const installmentStatusColors: Record<string, string> = {
+  pendiente: "bg-amber-100 text-amber-800",
+  pendiente_pago: "bg-amber-100 text-amber-800",
+  pagada: "bg-blue-100 text-blue-800",
+  vencida: "bg-red-100 text-red-800",
+};
+
 export function fillTemplate(template: string, vars: Record<string, string>): string {
   return template
     .replaceAll("[Nombre]", vars.nombre ?? "")

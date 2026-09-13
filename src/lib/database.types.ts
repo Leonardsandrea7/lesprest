@@ -24,6 +24,19 @@ export type LoanStatus =
 
 export type PaymentStatus = "pendiente_verificacion" | "confirmado" | "rechazado";
 
+export type InstallmentStatus = "pendiente" | "pendiente_pago" | "pagada" | "vencida";
+
+export interface LoanInstallment {
+  id: string;
+  loan_id: string;
+  installment_number: number;
+  amount: number;
+  due_at: string;
+  status: InstallmentStatus;
+  amount_paid: number;
+  paid_at: string | null;
+}
+
 export interface Profile {
   id: string;
   role: AppRole;
@@ -43,6 +56,8 @@ export interface LoanLevel {
   term_days: number;
   loans_required_to_unlock_next: number;
   is_active: boolean;
+  allow_installments: boolean;
+  installment_choices: number[];
 }
 
 export interface Kyc {
@@ -93,6 +108,7 @@ export interface Loan {
   paid_at: string | null;
   amount_paid: number;
   rejected_reason: string | null;
+  installments_count: number;
 }
 
 export interface LoanPayment {
@@ -107,6 +123,7 @@ export interface LoanPayment {
   status: PaymentStatus;
   rejection_reason: string | null;
   created_at: string;
+  installment_id: string | null;
 }
 
 export interface PlatformPaymentMethod {

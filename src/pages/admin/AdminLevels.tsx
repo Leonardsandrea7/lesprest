@@ -17,8 +17,14 @@ export function AdminLevels() {
     load();
   }, []);
 
-  function update(id: string, key: keyof LoanLevel, value: number) {
+  function update(id: string, key: keyof LoanLevel, value: number | boolean | number[]) {
     setLevels((ls) => ls.map((l) => (l.id === id ? { ...l, [key]: value } : l)));
+  }
+
+  function toggleChoice(level: LoanLevel, n: number) {
+    const current = level.installment_choices ?? [1];
+    const next = current.includes(n) ? current.filter((c) => c !== n) : [...current, n].sort();
+    update(level.id, "installment_choices", next.length ? next : [1]);
   }
 
   async function save(level: LoanLevel) {
@@ -31,6 +37,8 @@ export function AdminLevels() {
         return_rate_percent: level.return_rate_percent,
         term_days: level.term_days,
         loans_required_to_unlock_next: level.loans_required_to_unlock_next,
+        allow_installments: level.allow_installments,
+        installment_choices: level.installment_choices,
       })
       .eq("id", level.id);
     setSaving(null);
@@ -73,7 +81,37 @@ export function AdminLevels() {
               <p className="mt-3 text-sm text-[var(--muted)] tabular">
                 Ganancia: ${returnAmount.toFixed(2)} · Total a devolver: ${(level.principal_amount + returnAmount).toFixed(2)}
               </p>
-              <Button className="mt-3" disabled={saving === level.id} onClick={() => save(level)}>
+
+              <div className="mt-4 border-t border-[var(--line)] pt-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
+                  <input
+                    type="checkbox"
+                    checked={level.allow_installments}
+                    onChange={(e) => update(level.id, "allow_installments", e.target.checked)}
+                  />
+                  Permitir que el usuario elija pagar en cuotas
+                </label>
+                {level.allow_installments && (
+                  <div className="mt-2 flex gap-2">
+                    {[1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => toggleChoice(level, n)}
+                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                          (level.installment_choices ?? []).includes(n)
+                            ? "border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]"
+                            : "border-[var(--line)] text-[var(--muted)]"
+                        }`}
+                      >
+                        {n === 1 ? "Todo junto" : `${n} cuotas`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Button className="mt-4" disabled={saving === level.id} onClick={() => save(level)}>
                 {saving === level.id ? "Guardando..." : "Guardar nivel"}
               </Button>
             </Card>

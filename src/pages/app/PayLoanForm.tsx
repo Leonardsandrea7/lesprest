@@ -5,25 +5,33 @@ import { Button, Card, Field, Input, Select, Alert } from "../../components/ui";
 import { formatMoney, formatBs } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { useAuth } from "../../context/AuthContext";
-import type { Loan, PlatformPaymentMethod } from "../../lib/database.types";
+import type { Loan, LoanInstallment, PlatformPaymentMethod } from "../../lib/database.types";
 
 const BANKS = [
   "Banesco", "Banco de Venezuela", "Mercantil", "BNC", "Banco Provincial",
   "BOD", "Bancaribe", "Banplus", "Banco del Tesoro", "Bancamiga", "Otro",
 ];
 
-export function PayLoanForm({ loan, onSubmitted }: { loan: Loan; onSubmitted: () => void }) {
+export function PayLoanForm({
+  loan,
+  installment,
+  onSubmitted,
+}: {
+  loan: Loan;
+  installment?: LoanInstallment; // si el préstamo usa cuotas, esta es la que se está pagando
+  onSubmitted: () => void;
+}) {
   const [method, setMethod] = useState<PlatformPaymentMethod | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const pendingAmount = installment ? installment.amount - installment.amount_paid : loan.total_amount - loan.amount_paid;
   const [bank, setBank] = useState(BANKS[0]);
-  const [amount, setAmount] = useState(String(loan.total_amount - loan.amount_paid));
+  const [amount, setAmount] = useState(String(pendingAmount));
   const [reference, setReference] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const rate = useExchangeRate();
-  const pendingAmount = loan.total_amount - loan.amount_paid;
   const { session } = useAuth();
 
   useEffect(() => {
@@ -46,6 +54,7 @@ export function PayLoanForm({ loan, onSubmitted }: { loan: Loan; onSubmitted: ()
       p_amount: Number(amount),
       p_reference: reference.trim(),
       p_date: date,
+      p_installment_id: installment?.id ?? null,
     });
     setLoading(false);
     if (rpcError) {
@@ -70,7 +79,7 @@ export function PayLoanForm({ loan, onSubmitted }: { loan: Loan; onSubmitted: ()
         `Cédula: ${kyc?.document_id ?? "desconocida"}\n` +
         `WhatsApp: ${kyc?.whatsapp_number ?? "—"}\n` +
         `Usuario: ${session?.user.email ?? "desconocido"}\n` +
-        `Préstamo: ${loan.public_id}\n` +
+        `Préstamo: ${loan.public_id}${installment ? ` (cuota ${installment.installment_number} de ${loan.installments_count})` : ""}\n` +
         `Monto pagado: ${formatMoney(Number(amount))}${rate ? ` (${formatBs(Number(amount), rate)})` : ""}\n` +
         `Banco desde donde pagó: ${bank}\n` +
         `Referencia: ${reference.trim()}`
@@ -91,7 +100,9 @@ export function PayLoanForm({ loan, onSubmitted }: { loan: Loan; onSubmitted: ()
   if (!showForm) {
     return (
       <Card>
-        <h3 className="font-display text-lg font-semibold text-[var(--ink)]">Realiza tu pago</h3>
+        <h3 className="font-display text-lg font-semibold text-[var(--ink)]">
+          {installment ? `Pagar cuota ${installment.installment_number} de ${loan.installments_count}` : "Realiza tu pago"}
+        </h3>
         {method ? (
           <dl className="mt-4 space-y-2 text-sm">
             <Row label="Banco" value={method.bank} />

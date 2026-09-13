@@ -5,6 +5,7 @@ import { playSuccessSound } from "./sound";
 import type {
   Kyc,
   Loan,
+  LoanInstallment,
   LoanLevel,
   LoanPayment,
   UserPaymentMethod,
@@ -19,6 +20,7 @@ export interface UserLoanData {
   paymentMethod: UserPaymentMethod | null;
   hasAcceptedTerms: boolean;
   activeLoan: Loan | null; // cualquier préstamo no cerrado
+  activeLoanInstallments: LoanInstallment[];
   loanHistory: Loan[];
   payments: LoanPayment[];
   refresh: () => Promise<void>;
@@ -35,6 +37,7 @@ export function useUserLoanData(): UserLoanData {
   const [paymentMethod, setPaymentMethod] = useState<UserPaymentMethod | null>(null);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [activeLoan, setActiveLoan] = useState<Loan | null>(null);
+  const [activeLoanInstallments, setActiveLoanInstallments] = useState<LoanInstallment[]>([]);
   const [loanHistory, setLoanHistory] = useState<Loan[]>([]);
   const [payments, setPayments] = useState<LoanPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +87,19 @@ export function useUserLoanData(): UserLoanData {
 
       const loans = (loansRes.data as Loan[] | null) ?? [];
       setLoanHistory(loans);
-      setActiveLoan(loans.find((l) => OPEN_STATUSES.includes(l.status)) ?? null);
+      const currentActiveLoan = loans.find((l) => OPEN_STATUSES.includes(l.status)) ?? null;
+      setActiveLoan(currentActiveLoan);
+
+      if (currentActiveLoan && currentActiveLoan.installments_count > 1) {
+        const { data: installmentsData } = await supabase
+          .from("loan_installments")
+          .select("*")
+          .eq("loan_id", currentActiveLoan.id)
+          .order("installment_number", { ascending: true });
+        setActiveLoanInstallments((installmentsData as LoanInstallment[] | null) ?? []);
+      } else {
+        setActiveLoanInstallments([]);
+      }
 
       const loanIds = loans.map((l) => l.id);
       if (loanIds.length) {
@@ -138,6 +153,11 @@ export function useUserLoanData(): UserLoanData {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "loan_installments" },
+        () => refresh()
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "kyc", filter: `user_id=eq.${profile.id}` },
         () => refresh()
       )
@@ -157,6 +177,7 @@ export function useUserLoanData(): UserLoanData {
     paymentMethod,
     hasAcceptedTerms,
     activeLoan,
+    activeLoanInstallments,
     loanHistory,
     payments,
     refresh,

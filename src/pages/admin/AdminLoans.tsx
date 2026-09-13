@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { Card, Badge, Button, EmptyState, Field, Input } from "../../components/ui";
-import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors } from "../../lib/format";
+import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors, installmentStatusLabels, installmentStatusColors } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { playSuccessSound } from "../../lib/sound";
-import type { Loan, UserPaymentMethod } from "../../lib/database.types";
+import type { Loan, LoanInstallment, UserPaymentMethod } from "../../lib/database.types";
 
 interface LoanRow extends Loan {
   user_payment_methods?: UserPaymentMethod[];
@@ -13,6 +13,7 @@ interface LoanRow extends Loan {
 export function AdminLoans() {
   const [loans, setLoans] = useState<LoanRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [installmentsByLoan, setInstallmentsByLoan] = useState<Record<string, LoanInstallment[]>>({});
   const [disbForm, setDisbForm] = useState<Record<string, { amount: string; bank: string; reference: string; date: string; time: string }>>({});
   const rate = useExchangeRate();
 
@@ -24,6 +25,19 @@ export function AdminLoans() {
   useEffect(() => {
     load();
   }, []);
+
+  async function toggleExpand(loan: LoanRow) {
+    const next = expanded === loan.id ? null : loan.id;
+    setExpanded(next);
+    if (next && loan.installments_count > 1 && !installmentsByLoan[loan.id]) {
+      const { data } = await supabase
+        .from("loan_installments")
+        .select("*")
+        .eq("loan_id", loan.id)
+        .order("installment_number", { ascending: true });
+      setInstallmentsByLoan((s) => ({ ...s, [loan.id]: (data as LoanInstallment[]) ?? [] }));
+    }
+  }
 
   async function review(loan: Loan, decision: "aprobar" | "rechazar") {
     const reason = decision === "rechazar" ? window.prompt("Motivo del rechazo:") ?? undefined : undefined;
@@ -65,9 +79,12 @@ export function AdminLoans() {
           const isOpen = expanded === loan.id;
           return (
             <Card key={loan.id}>
-              <button className="flex w-full items-center justify-between text-left" onClick={() => setExpanded(isOpen ? null : loan.id)}>
+              <button className="flex w-full items-center justify-between text-left" onClick={() => toggleExpand(loan)}>
                 <div>
-                  <p className="font-semibold text-[var(--ink)]">{loan.public_id} · Nivel {loan.level_number}</p>
+                  <p className="font-semibold text-[var(--ink)]">
+                    {loan.public_id} · Nivel {loan.level_number}
+                    {loan.installments_count > 1 && ` · ${loan.installments_count} cuotas`}
+                  </p>
                   <p className="text-xs text-[var(--muted)] tabular">{formatMoney(loan.principal_amount)} · {formatDate(loan.requested_at)}</p>
                 </div>
                 <Badge className={loanStatusColors[loan.status]}>{loanStatusLabels[loan.status]}</Badge>
@@ -81,6 +98,23 @@ export function AdminLoans() {
                     <Info label="Pagado" value={formatMoney(loan.amount_paid)} sub={rate ? formatBs(loan.amount_paid, rate) : undefined} />
                     <Info label="Vencimiento" value={formatDate(loan.due_at)} />
                   </dl>
+
+                  {loan.installments_count > 1 && installmentsByLoan[loan.id] && (
+                    <div className="rounded-xl bg-black/[0.03] p-4">
+                      <p className="font-medium text-[var(--ink)]">Calendario de cuotas</p>
+                      <div className="mt-2 space-y-2">
+                        {installmentsByLoan[loan.id].map((inst) => (
+                          <div key={inst.id} className="flex items-center justify-between">
+                            <span className="text-[var(--ink)]">Cuota {inst.installment_number} · {formatDate(inst.due_at)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="tabular text-[var(--ink)]">{formatMoney(inst.amount)}</span>
+                              <Badge className={installmentStatusColors[inst.status]}>{installmentStatusLabels[inst.status]}</Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {["solicitado", "en_revision"].includes(loan.status) && (
                     <div className="flex gap-2">
