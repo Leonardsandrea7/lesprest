@@ -1,11 +1,13 @@
 import { useAuth } from "../../context/AuthContext";
 import { useUserLoanData } from "../../lib/useUserLoanData";
-import { Card } from "../../components/ui";
+import { usePushSubscription } from "../../lib/usePushSubscription";
+import { Card, Button, Alert } from "../../components/ui";
 import { kycStatusLabels } from "../../lib/format";
 
 export function Profile() {
   const { profile } = useAuth();
   const { kyc, paymentMethod } = useUserLoanData();
+  const { status, message, activate } = usePushSubscription();
 
   return (
     <div className="space-y-4">
@@ -14,6 +16,21 @@ export function Profile() {
       <Card>
         <p className="text-xs uppercase tracking-wide text-[var(--muted)]">Correo</p>
         <p className="mt-1 text-[15px] text-[var(--ink)]">{profile?.id ? "Sesión activa" : "—"}</p>
+      </Card>
+
+      <Card>
+        <p className="text-sm font-semibold text-[var(--ink)]">Notificaciones</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Recibe avisos de tus préstamos y novedades de LES PREST, aunque no tengas la app abierta.
+        </p>
+        {status === "activo" ? (
+          <p className="mt-3 text-sm font-semibold text-[var(--brand)]">✓ Notificaciones activadas</p>
+        ) : (
+          <Button className="mt-3" onClick={() => profile && activate(profile.id)} disabled={status === "requesting"}>
+            {status === "requesting" ? "Activando..." : "Activar notificaciones"}
+          </Button>
+        )}
+        {message && status !== "activo" && <div className="mt-3"><Alert kind={status === "error" ? "error" : "info"}>{message}</Alert></div>}
       </Card>
 
       <Card>

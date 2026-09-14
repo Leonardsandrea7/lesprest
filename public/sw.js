@@ -3,7 +3,7 @@
 // nueva desplegada, en vez de quedarse pegado sirviendo una copia vieja
 // para siempre). El número de versión del CACHE_NAME se debe subir cada
 // vez que se publique un cambio importante de infraestructura.
-const CACHE_NAME = "les-prest-v2";
+const CACHE_NAME = "les-prest-v3";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -34,6 +34,40 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+// ---------------------------------------------------------------------
+// Notificaciones push: se muestran aunque la app esté cerrada.
+// ---------------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "LES PREST", body: event.data ? event.data.text() : "" };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "LES PREST", {
+      body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url || "/app" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/app";
+  event.waitUntil(
+    clients.matchAll({ type: "window" }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(url) && "focus" in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });
 

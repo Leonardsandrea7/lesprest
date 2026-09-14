@@ -71,6 +71,8 @@ export interface Kyc {
   address: string;
   whatsapp_number: string;
   extra_info: string | null;
+  id_photo_path: string | null;
+  selfie_photo_path: string | null;
   status: KycStatus;
   reviewer_id: string | null;
   review_notes: string | null;

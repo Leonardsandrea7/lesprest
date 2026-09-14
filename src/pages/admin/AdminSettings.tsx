@@ -14,6 +14,11 @@ export function AdminSettings() {
   const [savingBot, setSavingBot] = useState(false);
   const [botMessage, setBotMessage] = useState<string | null>(null);
 
+  const [pushTitle, setPushTitle] = useState("");
+  const [pushBody, setPushBody] = useState("");
+  const [sendingPush, setSendingPush] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     const [{ data: rateData }, { data: botData }] = await Promise.all([
@@ -97,6 +102,39 @@ export function AdminSettings() {
     }
   }
 
+  async function sendPushNotification() {
+    if (!pushTitle.trim() || !pushBody.trim()) {
+      setPushMessage("Escribe un título y un mensaje.");
+      return;
+    }
+    setSendingPush(true);
+    setPushMessage(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("No hay sesión activa.");
+
+      const res = await fetch("https://hxthtzytyaytcevpveqo.supabase.co/functions/v1/send-push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: pushTitle, body: pushBody }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al enviar la notificación.");
+
+      setPushMessage(`Enviada a ${json.sent} de ${json.total} dispositivos suscritos.`);
+      setPushTitle("");
+      setPushBody("");
+    } catch (err: any) {
+      setPushMessage(err?.message ?? "Ocurrió un error al enviar la notificación.");
+    } finally {
+      setSendingPush(false);
+    }
+  }
+
   if (loading) return <p className="text-sm text-[var(--muted)]">Cargando...</p>;
 
   return (
@@ -146,6 +184,26 @@ export function AdminSettings() {
             Enviar mensaje de prueba
           </Button>
         </div>
+      </Card>
+
+      <Card>
+        <p className="font-semibold text-[var(--ink)]">Enviar novedad (notificación push)</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Le llega directo al celular de todos los usuarios que hayan activado las notificaciones,
+          aunque no tengan la app abierta.
+        </p>
+        <div className="mt-4 space-y-4">
+          <Field label="Título">
+            <Input value={pushTitle} onChange={(e) => setPushTitle(e.target.value)} placeholder="Ej: ¡Nueva promoción!" />
+          </Field>
+          <Field label="Mensaje">
+            <Input value={pushBody} onChange={(e) => setPushBody(e.target.value)} placeholder="Ej: Este mes tu segundo préstamo tiene mejor tasa." />
+          </Field>
+        </div>
+        {pushMessage && <div className="mt-4"><Alert kind="info">{pushMessage}</Alert></div>}
+        <Button className="mt-4" disabled={sendingPush} onClick={sendPushNotification}>
+          {sendingPush ? "Enviando..." : "Enviar a todos"}
+        </Button>
       </Card>
     </div>
   );
