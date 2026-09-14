@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { notifyTelegram, notifyTelegramPhoto } from "../../lib/telegram";
@@ -11,19 +11,101 @@ const VENEZUELA_STATES = [
   "Táchira", "Trujillo", "Vargas", "Yaracuy", "Zulia",
 ];
 
+const DRAFT_KEY = "lp_kyc_draft";
+
+type FormState = {
+  full_name: string; document_id: string; birth_date: string; state: string;
+  city: string; address: string; whatsapp_number: string; extra_info: string;
+};
+
+const EMPTY_FORM: FormState = {
+  full_name: "", document_id: "", birth_date: "", state: VENEZUELA_STATES[0],
+  city: "", address: "", whatsapp_number: "", extra_info: "",
+};
+
+// Convierte un archivo a texto (base64) para poder guardarlo temporalmente
+// y a un File de vuelta, para sobrevivir a una recarga de página sin
+// perder la foto ya tomada (esto pasa seguido en Android: el navegador
+// recarga la pestaña al volver de la app de cámara).
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type });
+}
+
 export function KycForm({ onDone }: { onDone: () => void }) {
   const { profile } = useAuth();
-  const [form, setForm] = useState({
-    full_name: "", document_id: "", birth_date: "", state: VENEZUELA_STATES[0],
-    city: "", address: "", whatsapp_number: "", extra_info: "",
-  });
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [selfiePhoto, setSelfiePhoto] = useState<File | null>(null);
+  const [idPreview, setIdPreview] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [restored, setRestored] = useState(false);
 
-  function update<K extends keyof typeof form>(key: K, value: string) {
+  // Restaurar borrador guardado (si el navegador recargó la página por
+  // cualquier motivo mientras la persona llenaba el formulario).
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) {
+      setRestored(true);
+      return;
+    }
+    try {
+      const draft = JSON.parse(raw);
+      if (draft.form) setForm(draft.form);
+      (async () => {
+        if (draft.idPhotoDataUrl) {
+          const file = await dataUrlToFile(draft.idPhotoDataUrl, "cedula.jpg");
+          setIdPhoto(file);
+          setIdPreview(draft.idPhotoDataUrl);
+        }
+        if (draft.selfiePhotoDataUrl) {
+          const file = await dataUrlToFile(draft.selfiePhotoDataUrl, "selfie.jpg");
+          setSelfiePhoto(file);
+          setSelfiePreview(draft.selfiePhotoDataUrl);
+        }
+        setRestored(true);
+      })();
+    } catch {
+      setRestored(true);
+    }
+  }, []);
+
+  // Guardar borrador en cada cambio, una vez que ya restauramos (para no
+  // sobreescribir el borrador con datos vacíos apenas carga la página).
+  useEffect(() => {
+    if (!restored) return;
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ form, idPhotoDataUrl: idPreview, selfiePhotoDataUrl: selfiePreview })
+    );
+  }, [form, idPreview, selfiePreview, restored]);
+
+  function update<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handlePhotoSelected(file: File | undefined, kind: "id" | "selfie") {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    if (kind === "id") {
+      setIdPhoto(file);
+      setIdPreview(dataUrl);
+    } else {
+      setSelfiePhoto(file);
+      setSelfiePreview(dataUrl);
+    }
   }
 
   async function uploadPhoto(file: File, kind: "cedula" | "selfie"): Promise<string> {
@@ -59,8 +141,6 @@ export function KycForm({ onDone }: { onDone: () => void }) {
       });
       if (insertError) throw insertError;
 
-      // Generar URLs temporales (5 minutos) solo para que Telegram pueda
-      // descargar las imágenes al momento de enviarlas. No quedan públicas.
       const [{ data: idUrl }, { data: selfieUrl }] = await Promise.all([
         supabase.storage.from("kyc-documents").createSignedUrl(idPhotoPath, 300),
         supabase.storage.from("kyc-documents").createSignedUrl(selfiePhotoPath, 300),
@@ -85,6 +165,8 @@ export function KycForm({ onDone }: { onDone: () => void }) {
       if (selfieUrl?.signedUrl) {
         await notifyTelegramPhoto(selfieUrl.signedUrl, "👤 Selfie de verificación");
       }
+
+      sessionStorage.removeItem(DRAFT_KEY);
     } catch (err: any) {
       setLoading(false);
       setError(err?.message?.includes("duplicate") ? "Ya tienes una verificación en curso." : err?.message ?? "Ocurrió un error al enviar tu verificación.");
@@ -130,29 +212,22 @@ export function KycForm({ onDone }: { onDone: () => void }) {
           <Input required value={form.whatsapp_number} onChange={(e) => update("whatsapp_number", e.target.value)} placeholder="+58 412 1234567" />
         </Field>
 
-        <Field label="Foto de tu cédula (frente)" hint="Toca para abrir la cámara">
-          <input
-            type="file"
-            accept="image/*"
+        <div className="grid grid-cols-2 gap-3">
+          <PhotoPickerCard
+            label="Foto de tu cédula"
+            icon={<IdCardIcon />}
+            preview={idPreview}
             capture="environment"
-            required
-            onChange={(e) => setIdPhoto(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-[var(--ink)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+            onSelect={(f) => handlePhotoSelected(f, "id")}
           />
-          {idPhoto && <p className="mt-1 text-xs text-[var(--success,var(--brand))]">✓ Foto lista: {idPhoto.name}</p>}
-        </Field>
-
-        <Field label="Selfie sosteniendo tu cédula" hint="Toca para abrir la cámara frontal">
-          <input
-            type="file"
-            accept="image/*"
+          <PhotoPickerCard
+            label="Selfie con tu cédula"
+            icon={<SelfieIcon />}
+            preview={selfiePreview}
             capture="user"
-            required
-            onChange={(e) => setSelfiePhoto(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-[var(--ink)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--brand)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+            onSelect={(f) => handlePhotoSelected(f, "selfie")}
           />
-          {selfiePhoto && <p className="mt-1 text-xs text-[var(--brand)]">✓ Foto lista: {selfiePhoto.name}</p>}
-        </Field>
+        </div>
 
         <Field label="Información adicional (opcional)">
           <Textarea rows={2} value={form.extra_info} onChange={(e) => update("extra_info", e.target.value)} />
@@ -163,5 +238,69 @@ export function KycForm({ onDone }: { onDone: () => void }) {
         </Button>
       </form>
     </div>
+  );
+}
+
+function PhotoPickerCard({
+  label,
+  icon,
+  preview,
+  capture,
+  onSelect,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  preview: string | null;
+  capture: "environment" | "user";
+  onSelect: (file: File | undefined) => void;
+}) {
+  const inputId = `photo-${capture}-${label.replace(/\s/g, "")}`;
+  return (
+    <label
+      htmlFor={inputId}
+      className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--paper-raised)] p-4 text-center transition-colors hover:border-[var(--brand)]"
+    >
+      {preview ? (
+        <img src={preview} alt={label} className="h-24 w-full rounded-xl object-cover" />
+      ) : (
+        <div className="flex h-24 w-full items-center justify-center rounded-xl bg-[var(--brand)]/10 text-[var(--brand)]">
+          {icon}
+        </div>
+      )}
+      <span className="text-xs font-medium text-[var(--ink)]">{label}</span>
+      <span className="text-[11px] font-semibold text-[var(--brand)]">
+        {preview ? "Cambiar foto" : "Tomar foto"}
+      </span>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/*"
+        capture={capture}
+        className="hidden"
+        onChange={(e) => onSelect(e.target.files?.[0])}
+      />
+    </label>
+  );
+}
+
+function IdCardIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+      <rect x="2.5" y="5" width="19" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="8" cy="11" r="1.8" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5 15.5c0-1.4 1.3-2.3 3-2.3s3 .9 3 2.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M13.5 10h5M13.5 13h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SelfieIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="10" r="2.6" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M7 15c0-1.8 2-2.8 5-2.8s5 1 5 2.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="18" cy="6.5" r="1" fill="currentColor" />
+    </svg>
   );
 }
