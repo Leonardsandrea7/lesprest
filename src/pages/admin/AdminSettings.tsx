@@ -4,6 +4,9 @@ import { Card, Button, Field, Input, Alert } from "../../components/ui";
 
 export function AdminSettings() {
   const [rate, setRate] = useState<string>("");
+  const [supportWhatsapp, setSupportWhatsapp] = useState("");
+  const [savingSupport, setSavingSupport] = useState(false);
+  const [supportMessage, setSupportMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -21,12 +24,14 @@ export function AdminSettings() {
 
   async function load() {
     setLoading(true);
-    const [{ data: rateData }, { data: botData }] = await Promise.all([
+    const [{ data: rateData }, { data: botData }, { data: supportData }] = await Promise.all([
       supabase.from("settings").select("value").eq("key", "usd_to_ves_rate").maybeSingle(),
       supabase.from("bot_config").select("*").eq("id", true).maybeSingle(),
+      supabase.from("settings").select("value").eq("key", "support_whatsapp_number").maybeSingle(),
     ]);
     const value = (rateData as { value: number } | null)?.value;
     setRate(typeof value === "number" ? String(value) : "");
+    setSupportWhatsapp(((supportData as { value: string } | null)?.value as string) ?? "");
 
     const bot = botData as { telegram_bot_token: string | null; telegram_chat_id: string | null; enabled: boolean } | null;
     setBotToken(bot?.telegram_bot_token ?? "");
@@ -58,6 +63,21 @@ export function AdminSettings() {
       return;
     }
     setMessage("Tasa actualizada. Ya se refleja en toda la plataforma.");
+  }
+
+  async function saveSupportWhatsapp() {
+    setSavingSupport(true);
+    setSupportMessage(null);
+    const { error } = await supabase
+      .from("settings")
+      .update({ value: supportWhatsapp.trim(), updated_at: new Date().toISOString() })
+      .eq("key", "support_whatsapp_number");
+    setSavingSupport(false);
+    if (error) {
+      setSupportMessage(error.message);
+      return;
+    }
+    setSupportMessage("Número de soporte actualizado.");
   }
 
   async function saveBot() {
@@ -155,6 +175,22 @@ export function AdminSettings() {
         {message && <div className="mt-4"><Alert kind="info">{message}</Alert></div>}
         <Button className="mt-4" disabled={saving} onClick={save}>
           {saving ? "Guardando..." : "Guardar tasa"}
+        </Button>
+      </Card>
+
+      <Card>
+        <p className="font-semibold text-[var(--ink)]">WhatsApp de soporte</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          El botón de ayuda flotante dentro de la app abre un chat directo a este número.
+        </p>
+        <div className="mt-4 max-w-xs">
+          <Field label="Número con código de país">
+            <Input value={supportWhatsapp} onChange={(e) => setSupportWhatsapp(e.target.value)} placeholder="+58 412 1234567" />
+          </Field>
+        </div>
+        {supportMessage && <div className="mt-4"><Alert kind="info">{supportMessage}</Alert></div>}
+        <Button className="mt-4" disabled={savingSupport} onClick={saveSupportWhatsapp}>
+          {savingSupport ? "Guardando..." : "Guardar número"}
         </Button>
       </Card>
 

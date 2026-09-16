@@ -12,6 +12,7 @@ const VENEZUELA_STATES = [
 ];
 
 const DRAFT_KEY = "lp_kyc_draft";
+const TOTAL_STEPS = 4;
 
 type FormState = {
   full_name: string; document_id: string; birth_date: string; state: string;
@@ -23,10 +24,6 @@ const EMPTY_FORM: FormState = {
   city: "", address: "", whatsapp_number: "", extra_info: "",
 };
 
-// Convierte un archivo a texto (base64) para poder guardarlo temporalmente
-// y a un File de vuelta, para sobrevivir a una recarga de página sin
-// perder la foto ya tomada (esto pasa seguido en Android: el navegador
-// recarga la pestaña al volver de la app de cámara).
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -44,6 +41,7 @@ async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
 
 export function KycForm({ onDone }: { onDone: () => void }) {
   const { profile } = useAuth();
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [selfiePhoto, setSelfiePhoto] = useState<File | null>(null);
@@ -53,8 +51,6 @@ export function KycForm({ onDone }: { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
   const [restored, setRestored] = useState(false);
 
-  // Restaurar borrador guardado (si el navegador recargó la página por
-  // cualquier motivo mientras la persona llenaba el formulario).
   useEffect(() => {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     if (!raw) {
@@ -64,15 +60,14 @@ export function KycForm({ onDone }: { onDone: () => void }) {
     try {
       const draft = JSON.parse(raw);
       if (draft.form) setForm(draft.form);
+      if (draft.step) setStep(draft.step);
       (async () => {
         if (draft.idPhotoDataUrl) {
-          const file = await dataUrlToFile(draft.idPhotoDataUrl, "cedula.jpg");
-          setIdPhoto(file);
+          setIdPhoto(await dataUrlToFile(draft.idPhotoDataUrl, "cedula.jpg"));
           setIdPreview(draft.idPhotoDataUrl);
         }
         if (draft.selfiePhotoDataUrl) {
-          const file = await dataUrlToFile(draft.selfiePhotoDataUrl, "selfie.jpg");
-          setSelfiePhoto(file);
+          setSelfiePhoto(await dataUrlToFile(draft.selfiePhotoDataUrl, "selfie.jpg"));
           setSelfiePreview(draft.selfiePhotoDataUrl);
         }
         setRestored(true);
@@ -82,15 +77,13 @@ export function KycForm({ onDone }: { onDone: () => void }) {
     }
   }, []);
 
-  // Guardar borrador en cada cambio, una vez que ya restauramos (para no
-  // sobreescribir el borrador con datos vacíos apenas carga la página).
   useEffect(() => {
     if (!restored) return;
     sessionStorage.setItem(
       DRAFT_KEY,
-      JSON.stringify({ form, idPhotoDataUrl: idPreview, selfiePhotoDataUrl: selfiePreview })
+      JSON.stringify({ form, step, idPhotoDataUrl: idPreview, selfiePhotoDataUrl: selfiePreview })
     );
-  }, [form, idPreview, selfiePreview, restored]);
+  }, [form, step, idPreview, selfiePreview, restored]);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -114,6 +107,34 @@ export function KycForm({ onDone }: { onDone: () => void }) {
     const { error: uploadError } = await supabase.storage.from("kyc-documents").upload(path, file);
     if (uploadError) throw uploadError;
     return path;
+  }
+
+  function validateStep(): string | null {
+    if (step === 1) {
+      if (!form.full_name || !form.document_id || !form.birth_date) return "Completa nombre, cédula y fecha de nacimiento.";
+    }
+    if (step === 2) {
+      if (!form.city || !form.address) return "Completa ciudad y dirección.";
+    }
+    if (step === 3) {
+      if (!form.whatsapp_number) return "Ingresa tu número de WhatsApp.";
+    }
+    return null;
+  }
+
+  function goNext() {
+    const validationError = validateStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError(null);
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS));
+  }
+
+  function goBack() {
+    setError(null);
+    setStep((s) => Math.max(s - 1, 1));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -180,62 +201,101 @@ export function KycForm({ onDone }: { onDone: () => void }) {
   return (
     <div>
       <h2 className="font-display text-xl font-semibold text-[var(--ink)]">Verifica tu perfil</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">Necesitamos estos datos para poder aprobar tu préstamo.</p>
+      <p className="mt-1 text-sm text-[var(--muted)]">Paso {step} de {TOTAL_STEPS}</p>
 
-      <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-        <Field label="Nombre completo">
-          <Input required value={form.full_name} onChange={(e) => update("full_name", e.target.value)} />
-        </Field>
-        <Field label="Cédula o documento de identidad">
-          <Input required value={form.document_id} onChange={(e) => update("document_id", e.target.value)} />
-        </Field>
-        <Field label="Fecha de nacimiento">
-          <Input required type="date" value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} />
-        </Field>
-        <Field label="Estado">
-          <select
-            required
-            value={form.state}
-            onChange={(e) => update("state", e.target.value)}
-            className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
-          >
-            {VENEZUELA_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Field>
-        <Field label="Ciudad">
-          <Input required value={form.city} onChange={(e) => update("city", e.target.value)} />
-        </Field>
-        <Field label="Dirección">
-          <Textarea required rows={2} value={form.address} onChange={(e) => update("address", e.target.value)} />
-        </Field>
-        <Field label="Número de WhatsApp" hint="Incluye el código de país, ej. +58 412 1234567">
-          <Input required value={form.whatsapp_number} onChange={(e) => update("whatsapp_number", e.target.value)} placeholder="+58 412 1234567" />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <PhotoPickerCard
-            label="Foto de tu cédula"
-            icon={<IdCardIcon />}
-            preview={idPreview}
-            capture="environment"
-            onSelect={(f) => handlePhotoSelected(f, "id")}
+      <div className="mt-3 flex gap-1.5">
+        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${i < step ? "bg-[var(--brand)]" : "bg-[var(--line)]"}`}
           />
-          <PhotoPickerCard
-            label="Selfie con tu cédula"
-            icon={<SelfieIcon />}
-            preview={selfiePreview}
-            capture="user"
-            onSelect={(f) => handlePhotoSelected(f, "selfie")}
-          />
-        </div>
+        ))}
+      </div>
 
-        <Field label="Información adicional (opcional)">
-          <Textarea rows={2} value={form.extra_info} onChange={(e) => update("extra_info", e.target.value)} />
-        </Field>
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        {step === 1 && (
+          <>
+            <Field label="Nombre completo">
+              <Input required value={form.full_name} onChange={(e) => update("full_name", e.target.value)} />
+            </Field>
+            <Field label="Cédula o documento de identidad">
+              <Input required value={form.document_id} onChange={(e) => update("document_id", e.target.value)} />
+            </Field>
+            <Field label="Fecha de nacimiento">
+              <Input required type="date" value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} />
+            </Field>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <Field label="Estado">
+              <select
+                required
+                value={form.state}
+                onChange={(e) => update("state", e.target.value)}
+                className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-4 py-3 text-[15px] outline-none focus:border-[var(--brand)]"
+              >
+                {VENEZUELA_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Ciudad">
+              <Input required value={form.city} onChange={(e) => update("city", e.target.value)} />
+            </Field>
+            <Field label="Dirección">
+              <Textarea required rows={2} value={form.address} onChange={(e) => update("address", e.target.value)} />
+            </Field>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <Field label="Número de WhatsApp" hint="Incluye el código de país, ej. +58 412 1234567">
+              <Input required value={form.whatsapp_number} onChange={(e) => update("whatsapp_number", e.target.value)} placeholder="+58 412 1234567" />
+            </Field>
+            <Field label="Información adicional (opcional)">
+              <Textarea rows={2} value={form.extra_info} onChange={(e) => update("extra_info", e.target.value)} />
+            </Field>
+          </>
+        )}
+
+        {step === 4 && (
+          <div className="grid grid-cols-2 gap-3">
+            <PhotoPickerCard
+              label="Foto de tu cédula"
+              icon={<IdCardIcon />}
+              preview={idPreview}
+              capture="environment"
+              onSelect={(f) => handlePhotoSelected(f, "id")}
+            />
+            <PhotoPickerCard
+              label="Selfie con tu cédula"
+              icon={<SelfieIcon />}
+              preview={selfiePreview}
+              capture="user"
+              onSelect={(f) => handlePhotoSelected(f, "selfie")}
+            />
+          </div>
+        )}
+
         {error && <Alert>{error}</Alert>}
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "Enviando..." : "Enviar para revisión"}
-        </Button>
+
+        <div className="flex gap-3 pt-2">
+          {step > 1 && (
+            <Button type="button" variant="secondary" onClick={goBack} className="flex-1">
+              Atrás
+            </Button>
+          )}
+          {step < TOTAL_STEPS ? (
+            <Button type="button" onClick={goNext} className="flex-[2]">
+              Siguiente
+            </Button>
+          ) : (
+            <Button type="submit" disabled={loading} className="flex-[2]">
+              {loading ? "Enviando..." : "Enviar para revisión"}
+            </Button>
+          )}
+        </div>
       </form>
     </div>
   );

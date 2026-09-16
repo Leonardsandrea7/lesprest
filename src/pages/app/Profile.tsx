@@ -2,6 +2,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useUserLoanData } from "../../lib/useUserLoanData";
 import { usePushSubscription } from "../../lib/usePushSubscription";
 import { Card, Button, Alert } from "../../components/ui";
+import { Faq } from "../../components/Faq";
 import { kycStatusLabels } from "../../lib/format";
 
 export function Profile() {
@@ -52,6 +53,8 @@ export function Profile() {
           <p className="mt-1 text-sm text-[var(--muted)]">Aún no registras tus datos de Pago Móvil.</p>
         )}
       </Card>
+
+      <Faq />
     </div>
   );
 }

@@ -29,6 +29,7 @@
   --font-body: "Inter", system-ui, sans-serif;
 
   font-family: var(--font-body);
+  font-size: 17px;
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;

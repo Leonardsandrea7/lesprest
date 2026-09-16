@@ -47,6 +47,11 @@ export function Dashboard() {
         </button>
       )}
 
+      {/* Acción principal: siempre un solo botón grande que dice
+          exactamente qué toca hacer ahora, para que el usuario no tenga
+          que buscar entre pestañas. */}
+      <MainAction kycStatus={kyc?.status} hasPaymentMethod={!!paymentMethod} activeLoan={activeLoan} />
+
       {currentLevel && (
         <div className="balance-card rounded-3xl p-6 text-white">
           <div className="flex items-center justify-between">
@@ -57,15 +62,6 @@ export function Dashboard() {
             {formatMoney(currentLevel.principal_amount)}
           </p>
           {rate ? <p className="mt-1 text-sm text-white/70 tabular">{formatBs(currentLevel.principal_amount, rate)}</p> : null}
-
-          {!activeLoan && (
-            <Link
-              to="/app/prestamo"
-              className="mt-6 block rounded-xl bg-white py-3 text-center text-[15px] font-semibold text-[var(--brand-dark)] hover:bg-white/90"
-            >
-              Solicitar préstamo
-            </Link>
-          )}
         </div>
       )}
 
@@ -93,12 +89,6 @@ export function Dashboard() {
               )}
             </div>
           </div>
-          <Link
-            to="/app/prestamo"
-            className="mt-4 block rounded-xl border border-[var(--line)] py-3 text-center text-[15px] font-semibold text-[var(--ink)] hover:border-[var(--brand)]"
-          >
-            Ver detalle
-          </Link>
         </Card>
       )}
 
@@ -125,6 +115,67 @@ export function Dashboard() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function MainAction({
+  kycStatus,
+  hasPaymentMethod,
+  activeLoan,
+}: {
+  kycStatus?: string;
+  hasPaymentMethod: boolean;
+  activeLoan: { status: string } | null;
+}) {
+  let label = "Solicitar préstamo";
+  let sub = "Estás listo para pedir tu préstamo";
+  let disabled = false;
+
+  if (activeLoan) {
+    if (["solicitado", "en_revision"].includes(activeLoan.status)) {
+      label = "Solicitud en revisión";
+      sub = "Te avisaremos apenas la aprobemos";
+      disabled = true;
+    } else if (["aprobado", "pendiente_desembolso"].includes(activeLoan.status)) {
+      label = "Preparando tu desembolso";
+      sub = "Pronto recibirás el dinero en tu Pago Móvil";
+      disabled = true;
+    } else if (activeLoan.status === "pendiente_pago") {
+      label = "Verificando tu pago";
+      sub = "Estamos confirmando tu operación";
+      disabled = true;
+    } else {
+      label = "Pagar mi cuota";
+      sub = "Realiza tu pago para mantenerte al día";
+    }
+  } else if (!kycStatus) {
+    label = "Verificar mi identidad";
+    sub = "Primer paso para acceder a tu préstamo";
+  } else if (kycStatus !== "aprobado") {
+    label = "Ver estado de mi verificación";
+    sub = "Tu verificación está en proceso";
+  } else if (!hasPaymentMethod) {
+    label = "Registrar mi Pago Móvil";
+    sub = "Para saber dónde enviarte el dinero";
+  }
+
+  if (disabled) {
+    return (
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper-raised)] p-5 text-center">
+        <p className="font-display text-lg font-semibold text-[var(--ink)]">{label}</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{sub}</p>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to="/app/prestamo"
+      className="block rounded-2xl bg-[var(--brand)] p-5 text-center text-white transition-colors hover:bg-[var(--brand-dark)]"
+    >
+      <p className="font-display text-lg font-semibold">{label}</p>
+      <p className="mt-1 text-sm text-white/80">{sub}</p>
+    </Link>
   );
 }
 

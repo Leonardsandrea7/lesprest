@@ -11,9 +11,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-webpush.setVapidDetails("mailto:admin@lesprest.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// Limpia la llave por si al copiar/pegar en Supabase se coló un espacio,
+// un salto de línea, o si por error se pegó "NOMBRE=valor" completo en
+// vez de solo el valor.
+function cleanKey(raw: string | undefined, envName: string): string {
+  if (!raw) return "";
+  let v = raw.trim();
+  if (v.startsWith(envName + "=")) v = v.slice(envName.length + 1);
+  v = v.replace(/\s+/g, "");
+  v = v.replace(/=+$/, "");
+  return v;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,6 +29,30 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const VAPID_PUBLIC_KEY = cleanKey(Deno.env.get("VAPID_PUBLIC_KEY"), "VAPID_PUBLIC_KEY");
+    const VAPID_PRIVATE_KEY = cleanKey(Deno.env.get("VAPID_PRIVATE_KEY"), "VAPID_PRIVATE_KEY");
+
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Faltan las llaves VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY en los secretos de esta función. Ve a Edge Functions -> send-push -> Secrets y agrégalas.",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (VAPID_PUBLIC_KEY.length !== 87 || VAPID_PRIVATE_KEY.length !== 43) {
+      return new Response(
+        JSON.stringify({
+          error: `Las llaves VAPID no tienen la longitud correcta (pública: ${VAPID_PUBLIC_KEY.length}, debe ser 87 · privada: ${VAPID_PRIVATE_KEY.length}, debe ser 43). Vuelve a copiarlas y guárdalas de nuevo, sin espacios extra.`,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    webpush.setVapidDetails("mailto:admin@lesprest.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
 
