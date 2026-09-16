@@ -21,7 +21,8 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
   const returnAmount = Math.round(level.principal_amount * (level.return_rate_percent / 100) * 100) / 100;
   const total = level.principal_amount + returnAmount;
   const perInstallment = Math.round((total / installments) * 100) / 100;
-  const estimatedDue = format(addDays(new Date(), level.term_days), "dd 'de' MMMM", { locale: es });
+  const totalDays = level.term_days * installments;
+  const estimatedDue = format(addDays(new Date(), totalDays), "dd 'de' MMMM", { locale: es });
 
   async function handleConfirm() {
     setLoading(true);
@@ -86,13 +87,14 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
               <button
                 key={n}
                 onClick={() => setInstallments(n)}
-                className={`rounded-xl border py-2.5 text-sm font-semibold transition-colors ${
+                className={`rounded-xl border py-2.5 text-center text-sm font-semibold transition-colors ${
                   installments === n
                     ? "border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]"
                     : "border-[var(--line)] text-[var(--muted)]"
                 }`}
               >
-                {n === 1 ? "Todo junto" : `${n} cuotas`}
+                <span className="block">{n === 1 ? "Todo junto" : `${n} cuotas`}</span>
+                <span className="block text-[11px] font-normal opacity-70">{level.term_days * n} días</span>
               </button>
             ))}
           </div>
@@ -106,7 +108,7 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
 
       <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
         <Row label="Total a devolver" value={formatMoney(total)} sub={rate ? formatBs(total, rate) : undefined} strong />
-        <Row label="Plazo" value={`${level.term_days} días`} />
+        <Row label="Plazo total" value={`${totalDays} días`} />
         <Row label="Fecha estimada de vencimiento" value={estimatedDue} />
       </dl>
 

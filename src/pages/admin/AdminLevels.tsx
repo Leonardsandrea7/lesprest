@@ -71,7 +71,7 @@ export function AdminLevels() {
                 <Field label="Retorno (%)">
                   <Input type="number" step="0.1" value={level.return_rate_percent} onChange={(e) => update(level.id, "return_rate_percent", Number(e.target.value))} />
                 </Field>
-                <Field label="Plazo (días)">
+                <Field label="Días por cuota" hint="Si el usuario elige 3 cuotas, el plazo total será 3 x este número">
                   <Input type="number" value={level.term_days} onChange={(e) => update(level.id, "term_days", Number(e.target.value))} />
                 </Field>
                 <Field label="Préstamos requeridos para subir">

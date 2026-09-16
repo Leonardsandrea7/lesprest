@@ -22,6 +22,9 @@ export function AdminSettings() {
   const [sendingPush, setSendingPush] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
 
+  const [sendingReminders, setSendingReminders] = useState(false);
+  const [remindersMessage, setRemindersMessage] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     const [{ data: rateData }, { data: botData }, { data: supportData }] = await Promise.all([
@@ -155,6 +158,31 @@ export function AdminSettings() {
     }
   }
 
+  async function sendRemindersNow() {
+    setSendingReminders(true);
+    setRemindersMessage(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("No hay sesión activa.");
+
+      const res = await fetch("https://hxthtzytyaytcevpveqo.supabase.co/functions/v1/send-reminders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al revisar vencimientos.");
+      setRemindersMessage(`Revisión completa: ${json.sent} recordatorio(s) enviado(s).`);
+    } catch (err: any) {
+      setRemindersMessage(err?.message ?? "Ocurrió un error al revisar vencimientos.");
+    } finally {
+      setSendingReminders(false);
+    }
+  }
+
   if (loading) return <p className="text-sm text-[var(--muted)]">Cargando...</p>;
 
   return (
@@ -239,6 +267,18 @@ export function AdminSettings() {
         {pushMessage && <div className="mt-4"><Alert kind="info">{pushMessage}</Alert></div>}
         <Button className="mt-4" disabled={sendingPush} onClick={sendPushNotification}>
           {sendingPush ? "Enviando..." : "Enviar a todos"}
+        </Button>
+      </Card>
+
+      <Card>
+        <p className="font-semibold text-[var(--ink)]">Recordatorios automáticos de pago</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Todos los días a las 9:00 AM se revisan solos los vencimientos (3 días antes, 1 día antes, y el día de hoy)
+          y se le manda un push personalizado a cada usuario. Usa este botón solo para probar sin esperar.
+        </p>
+        {remindersMessage && <div className="mt-4"><Alert kind="info">{remindersMessage}</Alert></div>}
+        <Button className="mt-4" variant="secondary" disabled={sendingReminders} onClick={sendRemindersNow}>
+          {sendingReminders ? "Revisando..." : "Revisar vencimientos ahora"}
         </Button>
       </Card>
     </div>
