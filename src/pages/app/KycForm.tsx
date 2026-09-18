@@ -314,12 +314,10 @@ function PhotoPickerCard({
   capture: "environment" | "user";
   onSelect: (file: File | undefined) => void;
 }) {
-  const inputId = `photo-${capture}-${label.replace(/\s/g, "")}`;
+  const [failed, setFailed] = useState(false);
+
   return (
-    <label
-      htmlFor={inputId}
-      className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--paper-raised)] p-4 text-center transition-colors hover:border-[var(--brand)]"
-    >
+    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--paper-raised)] p-4 text-center transition-colors hover:border-[var(--brand)]">
       {preview ? (
         <img src={preview} alt={label} className="h-24 w-full rounded-xl object-cover" />
       ) : (
@@ -331,13 +329,20 @@ function PhotoPickerCard({
       <span className="text-[11px] font-semibold text-[var(--brand)]">
         {preview ? "Cambiar foto" : "Tomar foto"}
       </span>
+      {failed && <span className="text-[11px] font-medium text-[var(--brick)]">No se detectó la foto, intenta de nuevo</span>}
       <input
-        id={inputId}
         type="file"
         accept="image/*"
         capture={capture}
         className="hidden"
-        onChange={(e) => onSelect(e.target.files?.[0])}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          setFailed(!file);
+          onSelect(file);
+          // Permite volver a elegir el mismo archivo (o reintentar) sin
+          // que el navegador ignore el segundo intento.
+          e.target.value = "";
+        }}
       />
     </label>
   );

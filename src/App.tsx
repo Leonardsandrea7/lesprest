@@ -35,7 +35,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/descargar" element={<Download />} />
           <Route path="/registro" element={<InstallGate><Register /></InstallGate>} />
-          <Route path="/login" element={<InstallGate><Login /></InstallGate>} />
+          <Route path="/login" element={<Login />} />
 
           <Route
             path="/app"
@@ -57,11 +57,9 @@ export default function App() {
           <Route
             path="/admin"
             element={
-              <InstallGate>
-                <RequireAdmin>
-                  <AdminLayout />
-                </RequireAdmin>
-              </InstallGate>
+              <RequireAdmin>
+                <AdminLayout />
+              </RequireAdmin>
             }
           >
             <Route index element={<AdminDashboard />} />

@@ -5,6 +5,7 @@ import { Card, Badge, ProgressBar } from "../../components/ui";
 import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors, daysRemaining } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { useInstallPrompt } from "../../lib/useInstallPrompt";
+import { LevelJourney } from "../../components/LevelJourney";
 
 export function Dashboard() {
   const { profile } = useAuth();
@@ -63,6 +64,15 @@ export function Dashboard() {
           </p>
           {rate ? <p className="mt-1 text-sm text-white/70 tabular">{formatBs(currentLevel.principal_amount, rate)}</p> : null}
         </div>
+      )}
+
+      {currentLevel && (
+        <Card>
+          <p className="text-xs font-medium text-[var(--muted)]">Tu camino de niveles</p>
+          <div className="mt-2">
+            <LevelJourney currentLevelNumber={currentLevel.level_number} />
+          </div>
+        </Card>
       )}
 
       {activeLoan && (
