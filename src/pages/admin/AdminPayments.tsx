@@ -3,7 +3,6 @@ import { supabase } from "../../lib/supabase";
 import { Card, Badge, Button, EmptyState } from "../../components/ui";
 import { formatMoney, formatDate, paymentStatusLabels } from "../../lib/format";
 import { playSuccessSound } from "../../lib/sound";
-import { notifyUserPush } from "../../lib/notifyUserPush";
 import type { LoanPayment } from "../../lib/database.types";
 
 const statusColors: Record<string, string> = {
@@ -36,22 +35,11 @@ export function AdminPayments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
-  async function review(payment: PaymentRow, decision: "aprobar" | "rechazar") {
+  async function review(payment: LoanPayment, decision: "aprobar" | "rechazar") {
     const reason = decision === "rechazar" ? window.prompt("Motivo del rechazo:") ?? undefined : undefined;
     const { error } = await supabase.rpc("admin_review_payment", { p_payment_id: payment.id, p_decision: decision, p_reason: reason });
     if (error) return alert(error.message);
-    if (decision === "aprobar") {
-      playSuccessSound();
-      // Revisamos si con este pago el préstamo quedó completamente pagado,
-      // para mandar el mensaje correcto.
-      const { data: loanData } = await supabase.from("loans").select("status, public_id").eq("id", payment.loan_id).maybeSingle();
-      const loanStatus = (loanData as { status?: string; public_id?: string } | null)?.status;
-      if (loanStatus === "pagado") {
-        notifyUserPush(payment.user_id, "¡Préstamo pagado! 🎉", `Terminaste de pagar ${payment.loans?.public_id ?? ""}. ¡Gracias por cumplir!`);
-      } else {
-        notifyUserPush(payment.user_id, "Pago confirmado ✅", `Tu pago con referencia ${payment.reference_number} fue verificado.`);
-      }
-    }
+    if (decision === "aprobar") playSuccessSound();
     load();
   }
 

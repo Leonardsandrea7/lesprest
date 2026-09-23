@@ -5,6 +5,7 @@ import { Card, Badge, ProgressBar } from "../../components/ui";
 import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors, daysRemaining } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { useInstallPrompt } from "../../lib/useInstallPrompt";
+import { LevelJourney } from "../../components/LevelJourney";
 
 export function Dashboard() {
   const { profile } = useAuth();
@@ -56,13 +57,22 @@ export function Dashboard() {
         <div className="balance-card rounded-3xl p-6 text-white">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-white/70">Crédito disponible</span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">{currentLevel.display_name || `Nivel ${currentLevel.level_number}`}</span>
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">Nivel {currentLevel.level_number}</span>
           </div>
           <p className="mt-4 font-display text-4xl font-extrabold tabular">
             {formatMoney(currentLevel.principal_amount)}
           </p>
           {rate ? <p className="mt-1 text-sm text-white/70 tabular">{formatBs(currentLevel.principal_amount, rate)}</p> : null}
         </div>
+      )}
+
+      {currentLevel && (
+        <Card>
+          <p className="text-xs font-medium text-[var(--muted)]">Tu camino de niveles</p>
+          <div className="mt-2">
+            <LevelJourney currentLevelNumber={currentLevel.level_number} />
+          </div>
+        </Card>
       )}
 
       {activeLoan && (

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { Logo } from "../components/Logo";
-import { LevelJourney } from "../components/LevelJourney";
 
 const steps = [
   { n: 1, text: "Regístrate con tu correo." },
@@ -11,7 +10,7 @@ const steps = [
   { n: 6, text: "Desbloquea el siguiente nivel." },
 ];
 
-const levelAmounts: Record<number, number> = { 1: 1, 2: 5, 3: 10, 4: 20, 5: 40, 6: 80 };
+const levels = [1, 5, 10, 20, 40, 80];
 
 export function Landing() {
   return (
@@ -47,13 +46,17 @@ export function Landing() {
           </div>
         </div>
 
-        {/* Escalera de niveles animada — la pelotita sube sola mostrando
-            hasta dónde puede crecer el crédito, con sonido incluido. */}
-        <div>
-          <LevelJourney currentLevelNumber={6} />
-          <p className="mt-3 text-center text-sm text-[var(--muted)]">
-            Desde ${levelAmounts[1]} hasta ${levelAmounts[6]}, subiendo de nivel con cada préstamo pagado a tiempo.
-          </p>
+        {/* Escalera de niveles — visual de la progresión real del producto */}
+        <div className="flex items-end justify-center gap-2.5">
+          {levels.map((amount, i) => (
+            <div key={amount} className="flex flex-col items-center gap-2">
+              <span className="font-display text-sm font-semibold text-[var(--ink)] tabular">${amount}</span>
+              <div
+                className="w-11 rounded-t-lg bg-[var(--brand)]"
+                style={{ height: `${44 + i * 26}px`, opacity: 0.55 + i * 0.09 }}
+              />
+            </div>
+          ))}
         </div>
       </section>
 

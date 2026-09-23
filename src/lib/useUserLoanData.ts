@@ -16,7 +16,6 @@ export interface UserLoanData {
   error: string | null;
   currentLevel: LoanLevel | null;
   nextLevel: LoanLevel | null;
-  unlockedLevels: LoanLevel[];
   kyc: Kyc | null;
   paymentMethod: UserPaymentMethod | null;
   hasAcceptedTerms: boolean;
@@ -24,8 +23,6 @@ export interface UserLoanData {
   activeLoanInstallments: LoanInstallment[];
   loanHistory: Loan[];
   payments: LoanPayment[];
-  toast: { title: string; body: string } | null;
-  dismissToast: () => void;
   refresh: () => Promise<void>;
 }
 
@@ -36,7 +33,6 @@ export function useUserLoanData(): UserLoanData {
   const [loading, setLoading] = useState(true);
   const [currentLevel, setCurrentLevel] = useState<LoanLevel | null>(null);
   const [nextLevel, setNextLevel] = useState<LoanLevel | null>(null);
-  const [unlockedLevels, setUnlockedLevels] = useState<LoanLevel[]>([]);
   const [kyc, setKyc] = useState<Kyc | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<UserPaymentMethod | null>(null);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
@@ -45,7 +41,6 @@ export function useUserLoanData(): UserLoanData {
   const [loanHistory, setLoanHistory] = useState<Loan[]>([]);
   const [payments, setPayments] = useState<LoanPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (!profile) {
@@ -76,15 +71,14 @@ export function useUserLoanData(): UserLoanData {
       setCurrentLevel(level);
 
       if (level) {
-        const [{ data: next }, { data: unlocked }] = await Promise.all([
-          supabase.from("loan_levels").select("*").eq("level_number", level.level_number + 1).maybeSingle(),
-          supabase.from("loan_levels").select("*").lte("level_number", level.level_number).eq("is_active", true).order("level_number", { ascending: true }),
-        ]);
+        const { data: next } = await supabase
+          .from("loan_levels")
+          .select("*")
+          .eq("level_number", level.level_number + 1)
+          .maybeSingle();
         setNextLevel((next as LoanLevel | null) ?? null);
-        setUnlockedLevels((unlocked as LoanLevel[] | null) ?? []);
       } else {
         setNextLevel(null);
-        setUnlockedLevels([]);
       }
 
       setKyc((kycRes.data as Kyc | null) ?? null);
@@ -144,15 +138,10 @@ export function useUserLoanData(): UserLoanData {
         (payload) => {
           const oldStatus = (payload.old as { status?: string } | null)?.status;
           const newStatus = (payload.new as { status?: string } | null)?.status;
-          // Suena y muestra un aviso en pantalla cuando el préstamo pasa a
-          // "activo" (aprobado y desembolsado) o queda "pagado".
-          if (oldStatus !== newStatus && newStatus === "activo") {
+          // Suena cuando el préstamo pasa a "activo" (aprobado y
+          // desembolsado) o queda "pagado" tras confirmar un pago.
+          if (oldStatus !== newStatus && (newStatus === "activo" || newStatus === "pagado")) {
             playSuccessSound();
-            setToast({ title: "¡Préstamo aprobado! 🎉", body: "Tu dinero ya está en camino a tu Pago Móvil." });
-          }
-          if (oldStatus !== newStatus && newStatus === "pagado") {
-            playSuccessSound();
-            setToast({ title: "¡Préstamo pagado! 🎉", body: "Gracias por cumplir. Sigue así para subir de nivel." });
           }
           refresh();
         }
@@ -184,7 +173,6 @@ export function useUserLoanData(): UserLoanData {
     error,
     currentLevel,
     nextLevel,
-    unlockedLevels,
     kyc,
     paymentMethod,
     hasAcceptedTerms,
@@ -192,8 +180,6 @@ export function useUserLoanData(): UserLoanData {
     activeLoanInstallments,
     loanHistory,
     payments,
-    toast,
-    dismissToast: () => setToast(null),
     refresh,
   };
 }

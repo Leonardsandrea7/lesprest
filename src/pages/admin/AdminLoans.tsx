@@ -4,7 +4,6 @@ import { Card, Badge, Button, EmptyState, Field, Input } from "../../components/
 import { formatMoney, formatBs, formatDate, loanStatusLabels, loanStatusColors, installmentStatusLabels, installmentStatusColors } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { playSuccessSound } from "../../lib/sound";
-import { notifyUserPush } from "../../lib/notifyUserPush";
 import type { Loan, LoanInstallment, UserPaymentMethod } from "../../lib/database.types";
 
 interface LoanRow extends Loan {
@@ -44,10 +43,7 @@ export function AdminLoans() {
     const reason = decision === "rechazar" ? window.prompt("Motivo del rechazo:") ?? undefined : undefined;
     const { error } = await supabase.rpc("admin_review_loan", { p_loan_id: loan.id, p_decision: decision, p_reason: reason });
     if (error) return alert(error.message);
-    if (decision === "aprobar") {
-      playSuccessSound();
-      notifyUserPush(loan.user_id, "Préstamo aprobado ✅", `Tu préstamo ${loan.public_id} fue aprobado. Pronto recibirás el desembolso.`);
-    }
+    if (decision === "aprobar") playSuccessSound();
     load();
   }
 
@@ -66,7 +62,6 @@ export function AdminLoans() {
       p_time: f.time,
     });
     if (error) return alert(error.message);
-    notifyUserPush(loan.user_id, "¡Tu dinero está en camino! 💸", `El préstamo ${loan.public_id} fue desembolsado a tu Pago Móvil.`);
     load();
   }
 

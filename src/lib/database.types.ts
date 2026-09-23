@@ -58,8 +58,6 @@ export interface LoanLevel {
   is_active: boolean;
   allow_installments: boolean;
   installment_choices: number[];
-  display_name: string | null;
-  badge_color: string | null;
 }
 
 export interface Kyc {

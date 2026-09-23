@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { Card, ProgressBar } from "../../components/ui";
-import { LevelBadge } from "../../components/LevelBadge";
 import { formatMoney } from "../../lib/format";
 import type { LoanLevel } from "../../lib/database.types";
 
@@ -45,7 +44,7 @@ export function Progress() {
         return (
           <Card key={level.id} className={isCurrent ? "border-[var(--brand)]" : isPast ? "opacity-60" : ""}>
             <div className="flex items-center justify-between">
-              <LevelBadge level={level} />
+              <span className="font-display font-semibold text-[var(--ink)]">Nivel {level.level_number}</span>
               <span className="font-display font-semibold text-[var(--ink)] tabular">{formatMoney(level.principal_amount)}</span>
             </div>
             {isCurrent && (
