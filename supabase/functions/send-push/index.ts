@@ -1,4 +1,4 @@
-// LES PREST — Edge Function: send-push
+// PrestApp — Edge Function: send-push
 // Envía una notificación push real a todos los usuarios suscritos.
 // Solo puede ser llamada por un administrador (se verifica el rol
 // usando el token del usuario que hace la petición).
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    webpush.setVapidDetails("mailto:admin@lesprest.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    webpush.setVapidDetails("mailto:admin@prestapp.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { title, body, url } = await req.json();
+    const { title, body, url, target_user_id } = await req.json();
     if (!title || !body) {
       return new Response(JSON.stringify({ error: "Falta título o mensaje" }), {
         status: 400,
@@ -96,7 +96,13 @@ Deno.serve(async (req) => {
     // Cliente con permisos totales, solo para leer suscripciones y
     // limpiar las que ya no sirven.
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: subs } = await adminClient.from("push_subscriptions").select("*");
+
+    // Si viene target_user_id, se manda solo a esa persona (por ejemplo,
+    // cuando se le aprueba su préstamo). Si no, se manda a todos (una
+    // "novedad" general).
+    let query = adminClient.from("push_subscriptions").select("*");
+    if (target_user_id) query = query.eq("user_id", target_user_id);
+    const { data: subs } = await query;
 
     const payload = JSON.stringify({ title, body, url: url || "/app" });
     let sent = 0;

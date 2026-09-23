@@ -2,13 +2,13 @@
 @import "tailwindcss";
 
 /* =====================================================================
-   LES PREST — Identidad tipo banco digital / billetera
+   PrestApp — Identidad tipo banco digital / billetera
    Azul profundo (confianza bancaria) + blanco limpio, verde para
    movimientos positivos, rojo contenido para alertas. Tarjeta de saldo
    como elemento protagonista, todo lo demás queda discreto alrededor.
    ===================================================================== */
 /* =====================================================================
-   LES PREST — Identidad tipo banco digital, modo oscuro
+   PrestApp — Identidad tipo banco digital, modo oscuro
    Fondo azul-negro profundo, tarjetas ligeramente más claras, azul
    brillante como acento (mejor contraste sobre fondo oscuro), verde
    para movimientos positivos, rojo suave para alertas.

@@ -12,7 +12,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
       <Logo size="lg" withText={false} />
       <h1 className="mt-8 font-display text-2xl font-semibold text-[var(--ink)]">Instala la app para continuar</h1>
       <p className="mt-3 max-w-sm text-[15px] text-[var(--muted)]">
-        LES PREST solo funciona como aplicación instalada. Instálala para acceder a tu cuenta.
+        PrestApp solo funciona como aplicación instalada. Instálala para acceder a tu cuenta.
       </p>
 
       {isIOS ? (
@@ -21,7 +21,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
           <ol className="mt-2 list-decimal space-y-1 pl-5">
             <li>Toca el botón "Compartir" (el cuadrado con la flecha) en Safari.</li>
             <li>Elige "Agregar a pantalla de inicio".</li>
-            <li>Abre LES PREST desde el ícono que aparece en tu pantalla.</li>
+            <li>Abre PrestApp desde el ícono que aparece en tu pantalla.</li>
           </ol>
         </div>
       ) : canInstall ? (

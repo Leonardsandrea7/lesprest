@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Logo } from "../components/Logo";
+import { LevelJourney } from "../components/LevelJourney";
 
 const steps = [
   { n: 1, text: "Regístrate con tu correo." },
@@ -10,7 +11,7 @@ const steps = [
   { n: 6, text: "Desbloquea el siguiente nivel." },
 ];
 
-const levels = [1, 5, 10, 20, 40, 80];
+const levelAmounts: Record<number, number> = { 1: 1, 2: 5, 3: 10, 4: 20, 5: 40, 6: 80 };
 
 export function Landing() {
   return (
@@ -34,29 +35,25 @@ export function Landing() {
             Tu préstamo seguro
           </h1>
           <p className="mt-4 max-w-md text-[17px] leading-relaxed text-[var(--muted)]">
-            Empieza pequeño, cumple tus pagos y aumenta tu acceso. LES PREST crece contigo, un préstamo a la vez.
+            Empieza pequeño, cumple tus pagos y aumenta tu acceso. PrestApp crece contigo, un préstamo a la vez.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/registro" className="rounded-xl bg-[var(--brand)] px-6 py-3.5 text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]">
               Solicitar mi préstamo
             </Link>
             <Link to="/descargar" className="rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-6 py-3.5 text-[15px] font-semibold text-[var(--ink)] hover:border-[var(--brand)]">
-              Instalar LES PREST
+              Instalar PrestApp
             </Link>
           </div>
         </div>
 
-        {/* Escalera de niveles — visual de la progresión real del producto */}
-        <div className="flex items-end justify-center gap-2.5">
-          {levels.map((amount, i) => (
-            <div key={amount} className="flex flex-col items-center gap-2">
-              <span className="font-display text-sm font-semibold text-[var(--ink)] tabular">${amount}</span>
-              <div
-                className="w-11 rounded-t-lg bg-[var(--brand)]"
-                style={{ height: `${44 + i * 26}px`, opacity: 0.55 + i * 0.09 }}
-              />
-            </div>
-          ))}
+        {/* Escalera de niveles animada — la pelotita sube sola mostrando
+            hasta dónde puede crecer el crédito, con sonido incluido. */}
+        <div>
+          <LevelJourney currentLevelNumber={6} />
+          <p className="mt-3 text-center text-sm text-[var(--muted)]">
+            Desde ${levelAmounts[1]} hasta ${levelAmounts[6]}, subiendo de nivel con cada préstamo pagado a tiempo.
+          </p>
         </div>
       </section>
 
@@ -78,7 +75,7 @@ export function Landing() {
       </section>
 
       <footer className="border-t border-[var(--line)] px-6 py-8 text-center text-sm text-[var(--muted)]">
-        LES PREST — Este producto se encuentra en preparación para operar conforme a la regulación aplicable en Venezuela.
+        PrestApp — Este producto se encuentra en preparación para operar conforme a la regulación aplicable en Venezuela.
       </footer>
     </div>
   );

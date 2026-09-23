@@ -1,4 +1,4 @@
-// LES PREST — Service worker (estrategia "network-first" para el shell
+// PrestApp — Service worker (estrategia "network-first" para el shell
 // de la app, para que cada visita revise primero si hay una versión
 // nueva desplegada, en vez de quedarse pegado sirviendo una copia vieja
 // para siempre). El número de versión del CACHE_NAME se debe subir cada
@@ -45,11 +45,11 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "LES PREST", body: event.data ? event.data.text() : "" };
+    data = { title: "PrestApp", body: event.data ? event.data.text() : "" };
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "LES PREST", {
+    self.registration.showNotification(data.title || "PrestApp", {
       body: data.body || "",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",

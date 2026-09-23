@@ -21,7 +21,7 @@ export function HelpButton() {
 
   return (
     <a
-      href={whatsappLink(number, "Hola, necesito ayuda con LES PREST")}
+      href={whatsappLink(number, "Hola, necesito ayuda con PrestApp")}
       target="_blank"
       rel="noreferrer"
       className="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand)] text-white shadow-lg shadow-black/20 transition-transform hover:scale-105"

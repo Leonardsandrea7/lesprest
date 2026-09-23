@@ -94,7 +94,7 @@ export function AdminPaymentMethods() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">Pago Móvil de LES PREST</h1>
+      <h1 className="font-display text-2xl font-semibold text-[var(--ink)]">Pago Móvil de PrestApp</h1>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {existingId
           ? "Estos datos se muestran a los usuarios cuando van a pagar su cuota."
