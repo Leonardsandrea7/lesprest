@@ -1,0 +1,54 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* =====================================================================
+   PrestApp — Identidad tipo banco digital / billetera
+   Azul profundo (confianza bancaria) + blanco limpio, verde para
+   movimientos positivos, rojo contenido para alertas. Tarjeta de saldo
+   como elemento protagonista, todo lo demás queda discreto alrededor.
+   ===================================================================== */
+/* =====================================================================
+   PrestApp — Identidad tipo banco digital, modo oscuro
+   Fondo azul-negro profundo, tarjetas ligeramente más claras, azul
+   brillante como acento (mejor contraste sobre fondo oscuro), verde
+   para movimientos positivos, rojo suave para alertas.
+   ===================================================================== */
+:root {
+  --ink: #e9edf6;          /* texto principal — casi blanco, tinte azulado */
+  --paper: #0b1220;        /* fondo base — azul-negro profundo */
+  --paper-raised: #141d31; /* tarjetas */
+  --brand: #3b82f6;        /* azul de acción — más brillante para contraste en oscuro */
+  --brand-dark: #12408f;   /* azul profundo — tarjeta de saldo, headers */
+  --gold: #e3a83e;         /* logro / progreso de nivel — uso restringido */
+  --success: #22c55e;      /* montos positivos, confirmaciones */
+  --brick: #ef4444;        /* errores / rechazos */
+  --line: #232d45;         /* bordes hairline */
+  --muted: #93a0b8;
+
+  --font-display: "Manrope", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  font-family: var(--font-body);
+  font-size: 17px;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Tarjeta de saldo (billetera) — el único momento "grande" de la interfaz */
+.balance-card {
+  background: linear-gradient(135deg, var(--brand-dark) 0%, #12408f 100%);
+  box-shadow: 0 16px 32px -14px rgba(11, 47, 107, 0.45);
+}
+
+::selection { background: var(--brand); color: white; }
