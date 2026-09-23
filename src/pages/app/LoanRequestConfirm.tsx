@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { notifyTelegram } from "../../lib/telegram";
 import { Button, Card, Alert } from "../../components/ui";
+import { LevelBadge } from "../../components/LevelBadge";
 import { formatMoney, formatBs } from "../../lib/format";
 import { useExchangeRate } from "../../lib/useExchangeRate";
 import { useAuth } from "../../context/AuthContext";
@@ -9,14 +10,31 @@ import type { LoanLevel } from "../../lib/database.types";
 import { addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
 
-export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; onRequested: () => void }) {
+export function LoanRequestConfirm({
+  unlockedLevels,
+  onRequested,
+}: {
+  unlockedLevels: LoanLevel[];
+  onRequested: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rate = useExchangeRate();
   const { session } = useAuth();
 
+  // Por default, se elige el monto más alto disponible (el que ya tiene
+  // desbloqueado), pero puede bajar a cualquier otro que necesite menos.
+  const sorted = [...unlockedLevels].sort((a, b) => b.level_number - a.level_number);
+  const [level, setLevel] = useState<LoanLevel>(sorted[0]);
+
   const choices = level.allow_installments && level.installment_choices?.length ? level.installment_choices : [1];
   const [installments, setInstallments] = useState<number>(choices[0]);
+
+  function selectLevel(l: LoanLevel) {
+    setLevel(l);
+    const newChoices = l.allow_installments && l.installment_choices?.length ? l.installment_choices : [1];
+    setInstallments(newChoices[0]);
+  }
 
   const returnAmount = Math.round(level.principal_amount * (level.return_rate_percent / 100) * 100) / 100;
   const total = level.principal_amount + returnAmount;
@@ -27,7 +45,10 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
   async function handleConfirm() {
     setLoading(true);
     setError(null);
-    const { data: loan, error: rpcError } = await supabase.rpc("request_loan", { p_installments: installments });
+    const { data: loan, error: rpcError } = await supabase.rpc("request_loan", {
+      p_level_number: level.level_number,
+      p_installments: installments,
+    });
     setLoading(false);
     if (rpcError) {
       setError(rpcError.message);
@@ -60,7 +81,7 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
         `Cédula: ${kyc?.document_id ?? "desconocida"}\n` +
         `WhatsApp: ${kyc?.whatsapp_number ?? "—"}\n` +
         `Usuario: ${session?.user.email ?? "desconocido"}\n` +
-        `Nivel: ${level.level_number}\n` +
+        `Nivel: ${level.display_name || level.level_number}\n` +
         `Monto a desembolsar: ${formatMoney(level.principal_amount)}${rate ? ` (${formatBs(level.principal_amount, rate)})` : ""}\n` +
         `Cuotas elegidas: ${installments}\n` +
         `ID: ${(loan as { public_id?: string } | null)?.public_id ?? ""}\n\n` +
@@ -74,50 +95,78 @@ export function LoanRequestConfirm({ level, onRequested }: { level: LoanLevel; o
   }
 
   return (
-    <Card>
-      <p className="text-sm font-medium text-[var(--muted)]">Nivel {level.level_number}</p>
-      <p className="mt-1 font-display text-3xl font-semibold text-[var(--ink)] tabular">{formatMoney(level.principal_amount)}</p>
-      {rate && <p className="text-sm text-[var(--muted)] tabular">{formatBs(level.principal_amount, rate)}</p>}
-
-      {choices.length > 1 && (
-        <div className="mt-4 border-t border-[var(--line)] pt-4">
-          <p className="text-sm font-medium text-[var(--ink)]">¿En cuántas cuotas quieres pagar?</p>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {choices.map((n) => (
+    <div className="space-y-4">
+      {sorted.length > 1 && (
+        <Card>
+          <p className="text-sm font-medium text-[var(--ink)]">¿Cuánto necesitas?</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">Puedes pedir menos de lo que ya desbloqueaste, sin problema.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {sorted.map((l) => (
               <button
-                key={n}
-                onClick={() => setInstallments(n)}
-                className={`rounded-xl border py-2.5 text-center text-sm font-semibold transition-colors ${
-                  installments === n
-                    ? "border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]"
-                    : "border-[var(--line)] text-[var(--muted)]"
+                key={l.id}
+                onClick={() => selectLevel(l)}
+                className={`rounded-xl border py-2.5 text-center transition-colors ${
+                  level.id === l.id
+                    ? "border-[var(--brand)] bg-[var(--brand)]/10"
+                    : "border-[var(--line)]"
                 }`}
               >
-                <span className="block">{n === 1 ? "Todo junto" : `${n} cuotas`}</span>
-                <span className="block text-[11px] font-normal opacity-70">{level.term_days * n} días</span>
+                <span className="block font-display text-base font-semibold tabular text-[var(--ink)]">
+                  {formatMoney(l.principal_amount)}
+                </span>
               </button>
             ))}
           </div>
-          {installments > 1 && (
-            <p className="mt-2 text-sm text-[var(--muted)] tabular">
-              {installments} pagos de {formatMoney(perInstallment)}{rate ? ` (${formatBs(perInstallment, rate)})` : ""} cada uno
-            </p>
-          )}
-        </div>
+        </Card>
       )}
 
-      <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
-        <Row label="Total a devolver" value={formatMoney(total)} sub={rate ? formatBs(total, rate) : undefined} strong />
-        <Row label="Plazo total" value={`${totalDays} días`} />
-        <Row label="Fecha estimada de vencimiento" value={estimatedDue} />
-      </dl>
+      <Card>
+        <div className="flex items-center justify-between">
+          <LevelBadge level={level} />
+        </div>
+        <p className="mt-2 font-display text-3xl font-semibold text-[var(--ink)] tabular">{formatMoney(level.principal_amount)}</p>
+        {rate && <p className="text-sm text-[var(--muted)] tabular">{formatBs(level.principal_amount, rate)}</p>}
 
-      {error && <div className="mt-4"><Alert>{error}</Alert></div>}
+        {choices.length > 1 && (
+          <div className="mt-4 border-t border-[var(--line)] pt-4">
+            <p className="text-sm font-medium text-[var(--ink)]">¿En cuántas cuotas quieres pagar?</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {choices.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setInstallments(n)}
+                  className={`rounded-xl border py-2.5 text-center text-sm font-semibold transition-colors ${
+                    installments === n
+                      ? "border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]"
+                      : "border-[var(--line)] text-[var(--muted)]"
+                  }`}
+                >
+                  <span className="block">{n === 1 ? "Todo junto" : `${n} cuotas`}</span>
+                  <span className="block text-[11px] font-normal opacity-70">{level.term_days * n} días</span>
+                </button>
+              ))}
+            </div>
+            {installments > 1 && (
+              <p className="mt-2 text-sm text-[var(--muted)] tabular">
+                {installments} pagos de {formatMoney(perInstallment)}{rate ? ` (${formatBs(perInstallment, rate)})` : ""} cada uno
+              </p>
+            )}
+          </div>
+        )}
 
-      <Button onClick={handleConfirm} disabled={loading} className="mt-5 w-full">
-        {loading ? "Enviando solicitud..." : "Confirmar solicitud"}
-      </Button>
-    </Card>
+        <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
+          <Row label="Total a devolver" value={formatMoney(total)} sub={rate ? formatBs(total, rate) : undefined} strong />
+          <Row label="Plazo total" value={`${totalDays} días`} />
+          <Row label="Fecha estimada de vencimiento" value={estimatedDue} />
+        </dl>
+
+        {error && <div className="mt-4"><Alert>{error}</Alert></div>}
+
+        <Button onClick={handleConfirm} disabled={loading} className="mt-5 w-full">
+          {loading ? "Enviando solicitud..." : "Confirmar solicitud"}
+        </Button>
+      </Card>
+    </div>
   );
 }
 

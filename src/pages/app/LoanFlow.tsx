@@ -51,8 +51,8 @@ export function LoanFlow() {
   }
 
   // 6) Todo listo: mostrar confirmación de solicitud
-  if (data.currentLevel) {
-    return <LoanRequestConfirm level={data.currentLevel} onRequested={data.refresh} />;
+  if (data.unlockedLevels.length > 0) {
+    return <LoanRequestConfirm unlockedLevels={data.unlockedLevels} onRequested={data.refresh} />;
   }
 
   return <EmptyState title="Sin nivel disponible" body="Contacta a soporte para activar tu cuenta." />;

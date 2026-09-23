@@ -17,7 +17,7 @@ export function AdminLevels() {
     load();
   }, []);
 
-  function update(id: string, key: keyof LoanLevel, value: number | boolean | number[]) {
+  function update(id: string, key: keyof LoanLevel, value: number | boolean | number[] | string) {
     setLevels((ls) => ls.map((l) => (l.id === id ? { ...l, [key]: value } : l)));
   }
 
@@ -39,6 +39,8 @@ export function AdminLevels() {
         loans_required_to_unlock_next: level.loans_required_to_unlock_next,
         allow_installments: level.allow_installments,
         installment_choices: level.installment_choices,
+        display_name: level.display_name,
+        badge_color: level.badge_color,
       })
       .eq("id", level.id);
     setSaving(null);
@@ -63,8 +65,27 @@ export function AdminLevels() {
           const returnAmount = Math.round(level.principal_amount * (level.return_rate_percent / 100) * 100) / 100;
           return (
             <Card key={level.id}>
-              <p className="font-display font-semibold text-[var(--ink)]">Nivel {level.level_number}</p>
+              <div className="flex items-center gap-3">
+                <p className="font-display font-semibold text-[var(--ink)]">Nivel {level.level_number}</p>
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+                  style={{ backgroundColor: level.badge_color || "#0a6cf5" }}
+                >
+                  {level.display_name || `Nivel ${level.level_number}`}
+                </span>
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label="Nombre del nivel">
+                  <Input value={level.display_name ?? ""} onChange={(e) => update(level.id, "display_name", e.target.value)} placeholder="Ej: Oro" />
+                </Field>
+                <Field label="Color de la insignia">
+                  <input
+                    type="color"
+                    value={level.badge_color ?? "#0a6cf5"}
+                    onChange={(e) => update(level.id, "badge_color", e.target.value)}
+                    className="h-[46px] w-full rounded-xl border border-[var(--line)] bg-white"
+                  />
+                </Field>
                 <Field label="Monto del préstamo ($)">
                   <Input type="number" step="0.01" value={level.principal_amount} onChange={(e) => update(level.id, "principal_amount", Number(e.target.value))} />
                 </Field>

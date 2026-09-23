@@ -1,11 +1,54 @@
-/**
- * Toca una nota de piano individual a una frecuencia dada. Usado para
- * armar melodías cortas nota por nota (ver playLevelClimb).
- */
-function playNote(freq: number, startDelay: number, duration = 0.35) {
+// =====================================================================
+// Los navegadores bloquean cualquier sonido que no venga directamente de
+// un clic/toque del usuario. Antes, cada función creaba su propio canal
+// de audio "desde cero" en el momento de sonar — y como la animación de
+// subir de nivel se dispara sola (no dentro de un clic), ese canal nacía
+// bloqueado y nunca sonaba.
+//
+// La solución: un solo canal de audio compartido para toda la app, que
+// se "desbloquea" una sola vez con el primer toque que la persona haga
+// en cualquier parte (iniciar sesión, tocar un botón, etc.). Una vez
+// desbloqueado, cualquier sonido posterior —aunque se dispare solo, sin
+// un clic directo— sí se escucha con normalidad.
+// =====================================================================
+
+let sharedContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new AudioContextClass();
+    if (!sharedContext) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      sharedContext = new AudioContextClass();
+    }
+    return sharedContext;
+  } catch {
+    return null;
+  }
+}
+
+function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+}
+
+if (typeof window !== "undefined") {
+  // Se desbloquea con el primer toque/clic en cualquier parte de la app,
+  // y no hace falta escuchar más eventos después de eso.
+  const unlockOnce = () => {
+    unlockAudio();
+    window.removeEventListener("pointerdown", unlockOnce);
+    window.removeEventListener("keydown", unlockOnce);
+  };
+  window.addEventListener("pointerdown", unlockOnce);
+  window.addEventListener("keydown", unlockOnce);
+}
+
+function playNote(freq: number, startDelay: number, duration = 0.35) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "triangle"; // más cálido y "de piano" que una sinusoide pura
@@ -20,24 +63,22 @@ function playNote(freq: number, startDelay: number, duration = 0.35) {
     gain.connect(ctx.destination);
     osc.start(startTime);
     osc.stop(startTime + duration + 0.05);
-    setTimeout(() => ctx.close(), (startDelay + duration + 0.3) * 1000);
   } catch {
     // Silencioso si el navegador bloquea el audio.
   }
 }
 
-// Escala pentatónica mayor (Do, Re, Mi, Sol, La, Do octava arriba...):
-// suena alegre y "de videojuego" sin notas que choquen entre sí, ideal
-// para una melodía ascendente de "subir de nivel".
+// Escala pentatónica mayor: suena alegre y "de videojuego" sin notas que
+// choquen entre sí, ideal para una melodía ascendente de "subir de nivel".
 const PENTATONIC_SCALE = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
 
 /**
  * Reproduce una melodía ascendente, una nota por cada paso/nivel, cada
- * vez más aguda — para acompañar una animación de "subiendo de nivel".
- * Llama a onStep(i) justo cuando debería sonar/iluminarse el paso i,
- * para sincronizar el sonido con la animación visual.
+ * vez más aguda. Llama a onStep(i) justo cuando debería sonar/iluminarse
+ * el paso i, para sincronizar el sonido con la animación visual.
  */
 export function playLevelClimb(steps: number, onStep?: (index: number) => void) {
+  unlockAudio();
   const interval = 0.28;
   for (let i = 0; i < steps; i++) {
     const freq = PENTATONIC_SCALE[Math.min(i, PENTATONIC_SCALE.length - 1)];
@@ -48,13 +89,13 @@ export function playLevelClimb(steps: number, onStep?: (index: number) => void) 
 
 /**
  * Reproduce un sonido corto y agradable de "confirmación" (como una
- * campanita ascendente de dos notas) usando la Web Audio API.
+ * campanita ascendente de dos notas).
  */
 export function playSuccessSound() {
+  unlockAudio();
+  const ctx = getAudioContext();
+  if (!ctx) return;
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new AudioContextClass();
-
     const notes = [
       { freq: 880, start: 0, duration: 0.18 },
       { freq: 1318.5, start: 0.11, duration: 0.32 },
@@ -76,8 +117,6 @@ export function playSuccessSound() {
       osc.start(startTime);
       osc.stop(startTime + duration + 0.05);
     });
-
-    setTimeout(() => ctx.close(), 700);
   } catch {
     // Silencioso si el navegador bloquea el audio.
   }
