@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useUserLoanData } from "../lib/useUserLoanData";
+import { useLoanToast } from "../lib/useLoanToast";
 import { BottomNav } from "./BottomNav";
 import { Logo } from "./Logo";
 import { HelpButton } from "./HelpButton";
@@ -10,7 +10,7 @@ import { Toast } from "./Toast";
 export function AppLayout() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast, dismissToast } = useUserLoanData();
+  const { toast, dismissToast } = useLoanToast();
 
   async function handleSignOut() {
     await signOut();
