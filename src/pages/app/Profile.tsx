@@ -22,7 +22,7 @@ export function Profile() {
       <Card>
         <p className="text-sm font-semibold text-[var(--ink)]">Notificaciones</p>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Recibe avisos de tus préstamos y novedades de PrestApp, aunque no tengas la app abierta.
+          Recibe avisos de tus préstamos y novedades de LES PREST, aunque no tengas la app abierta.
         </p>
         {status === "activo" ? (
           <p className="mt-3 text-sm font-semibold text-[var(--brand)]">✓ Notificaciones activadas</p>

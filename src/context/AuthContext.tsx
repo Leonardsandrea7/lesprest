@@ -25,19 +25,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    let active = true;
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
       setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id).finally(() => setLoading(false));
-      else setLoading(false);
+
+      if (data.session) {
+        try {
+          await loadProfile(data.session.user.id);
+        } finally {
+          if (active) setLoading(false);
+        }
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      if (newSession) loadProfile(newSession.user.id);
-      else setProfile(null);
+
+      if (!newSession) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      // El cambio de sesión puede ocurrir antes de que el perfil termine de
+      // cargarse. Mantener la aplicación en estado de carga evita que la
+      // ruta /app se renderice con profile=null durante ese instante.
+      setLoading(true);
+      void loadProfile(newSession.user.id).finally(() => {
+        if (active) setLoading(false);
+      });
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   // Actualiza el perfil automáticamente en cuanto cambie en la base de

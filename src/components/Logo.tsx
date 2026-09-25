@@ -10,7 +10,7 @@ export function Logo({ size = "md", withText = true }: { size?: "sm" | "md" | "l
         LP
       </span>
       {withText && (
-        <span className={`font-display ${textSize} font-semibold text-[var(--ink)]`}>PrestApp</span>
+        <span className={`font-display ${textSize} font-semibold text-[var(--ink)]`}>LES PREST</span>
       )}
     </span>
   );

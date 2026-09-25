@@ -1,4 +1,4 @@
-// PrestApp — Edge Function: send-push
+// LES PREST — Edge Function: send-push
 // Envía una notificación push real a todos los usuarios suscritos.
 // Solo puede ser llamada por un administrador (se verifica el rol
 // usando el token del usuario que hace la petición).
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    webpush.setVapidDetails("mailto:admin@prestapp.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    webpush.setVapidDetails("mailto:admin@lesprest.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");

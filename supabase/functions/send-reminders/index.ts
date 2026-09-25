@@ -1,4 +1,4 @@
-// PrestApp — Edge Function: send-reminders
+// LES PREST — Edge Function: send-reminders
 // Revisa qué cuotas (o préstamos sin cuotas) vencen en 3 días, en 1 día,
 // o hoy, y le manda un push al usuario correspondiente. Pensada para
 // correr sola todos los días mediante pg_cron (ver migración 0012).
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    webpush.setVapidDetails("mailto:admin@prestapp.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    webpush.setVapidDetails("mailto:admin@lesprest.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
     const windows: { type: string; days: number; text: string }[] = [
       { type: "3_dias", days: 3, text: "vence en 3 días" },
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         const count = await sendToUser(
           adminClient,
           loanInfo.user_id,
-          "Recordatorio de pago — PrestApp",
+          "Recordatorio de pago — LES PREST",
           `Tu cuota de ${loanInfo.public_id} ${w.text}.`
         );
         if (count > 0) {
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
         const count = await sendToUser(
           adminClient,
           loan.user_id,
-          "Recordatorio de pago — PrestApp",
+          "Recordatorio de pago — LES PREST",
           `Tu préstamo ${loan.public_id} ${w.text}.`
         );
         if (count > 0) {

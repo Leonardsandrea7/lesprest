@@ -43,7 +43,7 @@ export function Dashboard() {
           onClick={promptInstall}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand)] py-3 text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]"
         >
-          ⬇ Instalar la app PrestApp
+          ⬇ Instalar la app LES PREST
         </button>
       )}
 

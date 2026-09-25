@@ -1,6 +1,6 @@
 {
-  "name": "PrestApp — Tu préstamo seguro",
-  "short_name": "PrestApp",
+  "name": "LES PREST — Tu préstamo seguro",
+  "short_name": "LES PREST",
   "description": "Microcréditos progresivos para Venezuela.",
   "start_url": "/",
   "display": "standalone",

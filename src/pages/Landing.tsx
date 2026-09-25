@@ -35,14 +35,14 @@ export function Landing() {
             Tu préstamo seguro
           </h1>
           <p className="mt-4 max-w-md text-[17px] leading-relaxed text-[var(--muted)]">
-            Empieza pequeño, cumple tus pagos y aumenta tu acceso. PrestApp crece contigo, un préstamo a la vez.
+            Empieza pequeño, cumple tus pagos y aumenta tu acceso. LES PREST crece contigo, un préstamo a la vez.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/registro" className="rounded-xl bg-[var(--brand)] px-6 py-3.5 text-[15px] font-semibold text-white hover:bg-[var(--brand-dark)]">
               Solicitar mi préstamo
             </Link>
             <Link to="/descargar" className="rounded-xl border border-[var(--line)] bg-[var(--paper-raised)] px-6 py-3.5 text-[15px] font-semibold text-[var(--ink)] hover:border-[var(--brand)]">
-              Instalar PrestApp
+              Instalar LES PREST
             </Link>
           </div>
         </div>
@@ -75,7 +75,7 @@ export function Landing() {
       </section>
 
       <footer className="border-t border-[var(--line)] px-6 py-8 text-center text-sm text-[var(--muted)]">
-        PrestApp — Este producto se encuentra en preparación para operar conforme a la regulación aplicable en Venezuela.
+        LES PREST — Este producto se encuentra en preparación para operar conforme a la regulación aplicable en Venezuela.
       </footer>
     </div>
   );
