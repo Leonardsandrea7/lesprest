@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { playSuccessSound } from "./sound";
 import type {
   Kyc,
   Loan,
@@ -24,8 +23,6 @@ export interface UserLoanData {
   activeLoanInstallments: LoanInstallment[];
   loanHistory: Loan[];
   payments: LoanPayment[];
-  toast: { title: string; body: string } | null;
-  dismissToast: () => void;
   refresh: () => Promise<void>;
 }
 
@@ -45,7 +42,6 @@ export function useUserLoanData(): UserLoanData {
   const [loanHistory, setLoanHistory] = useState<Loan[]>([]);
   const [payments, setPayments] = useState<LoanPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (!profile) {
@@ -141,21 +137,7 @@ export function useUserLoanData(): UserLoanData {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "loans", filter: `user_id=eq.${profile.id}` },
-        (payload) => {
-          const oldStatus = (payload.old as { status?: string } | null)?.status;
-          const newStatus = (payload.new as { status?: string } | null)?.status;
-          // Suena y muestra un aviso en pantalla cuando el préstamo pasa a
-          // "activo" (aprobado y desembolsado) o queda "pagado".
-          if (oldStatus !== newStatus && newStatus === "activo") {
-            playSuccessSound();
-            setToast({ title: "¡Préstamo aprobado! 🎉", body: "Tu dinero ya está en camino a tu Pago Móvil." });
-          }
-          if (oldStatus !== newStatus && newStatus === "pagado") {
-            playSuccessSound();
-            setToast({ title: "¡Préstamo pagado! 🎉", body: "Gracias por cumplir. Sigue así para subir de nivel." });
-          }
-          refresh();
-        }
+        () => refresh()
       )
       .on(
         "postgres_changes",
@@ -192,8 +174,6 @@ export function useUserLoanData(): UserLoanData {
     activeLoanInstallments,
     loanHistory,
     payments,
-    toast,
-    dismissToast: () => setToast(null),
     refresh,
   };
 }
