@@ -55,20 +55,37 @@ export const ClientPanel: React.FC = () => {
 
   const [reference, setReference] = useState('');
 
+  // Nunca dejamos que una llamada se quede colgada para siempre (ej. variables
+  // de entorno de Supabase mal configuradas, o conexión inestable). Si tarda
+  // más de 12s, se resuelve con un valor por defecto en vez de trabar la pantalla.
+  const withTimeout = <T,>(promise: Promise<T>, fallback: T, ms = 12000): Promise<T> =>
+    Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+    ]);
+
   const loadAll = async () => {
-    if (!profile) return;
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
       const [lv, rate, pay, l, p, n] = await Promise.all([
-        getLoanLevels(),
-        getBcvRate(),
-        getPayoutInfo(),
-        getMyLoans(profile.id),
-        getMyPayments(profile.id),
-        getMyNotifications(profile.id)
+        withTimeout(getLoanLevels(), []),
+        withTimeout(getBcvRate(), 54.25),
+        withTimeout(getPayoutInfo(), { bank_name: 'Por definir', phone: 'Por definir', id_card: 'Por definir', holder_name: 'PrestApp' }),
+        withTimeout(getMyLoans(profile.id), []),
+        withTimeout(getMyPayments(profile.id), []),
+        withTimeout(getMyNotifications(profile.id), [])
       ]);
-      setLevels(lv);
+
+      if (lv.length === 0) {
+        setLoadError('No se pudo conectar con la base de datos (Supabase). Revisa que VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY estén bien configuradas en Vercel, y que hayas corrido supabase_migration_v3.sql.');
+      }
+
+      setLevels(lv.length > 0 ? lv : [{ level: 1, max_amount_usd: 1, rate_percent: 6, installments: 1, interval_days: 10, payments_to_advance: 2 }]);
       setBcvRate(rate);
       setPayout(pay);
       setLoans(l);
