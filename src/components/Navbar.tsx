@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, ShieldCheck, Download } from 'lucide-react';
+import { Shield, ShieldCheck, Download, User } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, isAdmin } = useAuth();
@@ -22,6 +22,16 @@ export const Navbar: React.FC = () => {
         </Link>
 
         <div className="flex items-center space-x-3">
+          {user && (
+            <Link
+              to="/dashboard"
+              className="flex items-center space-x-1.5 text-xs font-black text-blue-400 bg-blue-500/10 border border-blue-500/30 px-3 py-2 rounded-xl hover:bg-blue-500/20 transition"
+            >
+              <User className="w-4 h-4" />
+              <span>Mi Cuenta</span>
+            </Link>
+          )}
+
           {isAdmin && (
             <Link
               to="/admin"

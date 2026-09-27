@@ -15,7 +15,9 @@ import {
   Calendar,
   Layers,
   Ban,
-  Trash2
+  Trash2,
+  ShieldQuestion,
+  XCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sendTelegramMessage } from '../lib/telegram';
@@ -34,6 +36,7 @@ export const Admin: React.FC = () => {
   const [pendingPayments, setPendingPayments] = useState<any[]>([]);
   const [pendingLoans, setPendingLoans] = useState<any[]>([]);
   const [blacklist, setBlacklist] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
 
@@ -74,6 +77,15 @@ export const Admin: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (blacklistData) setBlacklist(blacklistData);
+
+      // 3b. Clientes (para revisión de KYC)
+      const { data: clientsData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'cliente')
+        .order('created_at', { ascending: false });
+
+      if (clientsData) setClients(clientsData);
 
       // 4. Settings
       const { data: settingsData } = await supabase
@@ -295,6 +307,43 @@ export const Admin: React.FC = () => {
     }
   };
 
+  // VERIFICACIÓN DE KYC (aprueba/rechaza la cédula y selfie subidas por el cliente)
+  const handleVerifyKyc = async (clientId: string, clientName: string) => {
+    try {
+      await supabase.from('profiles').update({ kyc_status: 'verificado' }).eq('id', clientId);
+      await supabase.from('notifications').insert([
+        {
+          user_id: clientId,
+          title: '✅ Identidad Verificada',
+          body: 'Tu cédula y selfie fueron verificadas. Ya puedes solicitar tu primer microcrédito.',
+          type: 'kyc'
+        }
+      ]);
+      setMsg(`KYC de ${clientName} verificado. Ya puede solicitar préstamo.`);
+      loadData();
+    } catch (err: any) {
+      setMsg('Error verificando KYC: ' + err.message);
+    }
+  };
+
+  const handleRejectKyc = async (clientId: string, clientName: string) => {
+    try {
+      await supabase.from('profiles').update({ kyc_status: 'rechazado' }).eq('id', clientId);
+      await supabase.from('notifications').insert([
+        {
+          user_id: clientId,
+          title: '❌ Verificación Rechazada',
+          body: 'No pudimos validar tu cédula o selfie. Por favor contacta a soporte o vuelve a registrarte con fotos más claras.',
+          type: 'kyc'
+        }
+      ]);
+      setMsg(`KYC de ${clientName} rechazado.`);
+      loadData();
+    } catch (err: any) {
+      setMsg('Error rechazando KYC: ' + err.message);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
       {/* Header */}
@@ -496,6 +545,80 @@ export const Admin: React.FC = () => {
         >
           Guardar Parámetros de Préstamo
         </button>
+      </div>
+
+      {/* 2b. CLIENTES Y VERIFICACIÓN DE KYC */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-800">
+          <ShieldQuestion className="w-5 h-5 text-blue-400" />
+          <span>Clientes y Verificación de KYC</span>
+          <span className="text-xs font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
+            {clients.filter((c) => c.kyc_status === 'en_revision').length} en revisión
+          </span>
+        </h2>
+
+        {clients.length === 0 ? (
+          <p className="text-xs text-slate-400 py-6 text-center">Todavía no hay clientes registrados.</p>
+        ) : (
+          <div className="space-y-3">
+            {clients.map((c) => (
+              <div key={c.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    {c.cedula_url ? (
+                      <a href={c.cedula_url} target="_blank" rel="noreferrer">
+                        <img src={c.cedula_url} alt="Cédula" className="w-12 h-12 object-cover rounded-lg border border-slate-700" />
+                      </a>
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>
+                    )}
+                    {c.selfie_url ? (
+                      <a href={c.selfie_url} target="_blank" rel="noreferrer">
+                        <img src={c.selfie_url} alt="Selfie" className="w-12 h-12 object-cover rounded-lg border border-slate-700" />
+                      </a>
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">{c.full_name}</p>
+                    <p className="text-[11px] text-slate-500">{c.id_card} • {c.email} • Nivel {c.current_level}</p>
+                    <span
+                      className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        c.kyc_status === 'verificado'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : c.kyc_status === 'rechazado'
+                          ? 'bg-rose-500/20 text-rose-400'
+                          : 'bg-amber-500/20 text-amber-400'
+                      }`}
+                    >
+                      {c.kyc_status}
+                    </span>
+                  </div>
+                </div>
+
+                {c.kyc_status !== 'verificado' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleVerifyKyc(c.id, c.full_name)}
+                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Verificar</span>
+                    </button>
+                    <button
+                      onClick={() => handleRejectKyc(c.id, c.full_name)}
+                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-1"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Rechazar</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 3. PAGOS MÓVILES REPORTADOS (VALIDACIÓN A TIEMPO VS TARDE) */}

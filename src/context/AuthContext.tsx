@@ -8,7 +8,10 @@ export interface UserProfile {
   phone: string;
   email: string;
   current_level: number;
-  kyc_status: 'no_verificado' | 'en_revision' | 'verificado';
+  kyc_status: 'no_verificado' | 'en_revision' | 'verificado' | 'rechazado';
+  is_blacklisted?: boolean;
+  cedula_url?: string;
+  selfie_url?: string;
   role: 'cliente' | 'admin';
   bank_name?: string;
 }
@@ -19,7 +22,7 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   login: (email: string, pass: string) => Promise<{ error: any | null; profile?: UserProfile | null }>;
-  register: (data: any) => Promise<{ error: any | null }>;
+  register: (data: any) => Promise<{ error: any | null; userId?: string }>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -116,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const userId = authData.user?.id;
       if (userId) {
-        const newProfile: Partial<UserProfile> = {
+        const newProfile: Partial<UserProfile> & { cedula_url?: string; selfie_url?: string } = {
           id: userId,
           full_name: data.full_name,
           id_card: data.id_card,
@@ -125,7 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           current_level: 1,
           kyc_status: 'en_revision',
           role: 'cliente',
-          bank_name: data.bank_name
+          bank_name: data.bank_name,
+          cedula_url: data.cedula_url,
+          selfie_url: data.selfie_url
         };
 
         const { error: profileError } = await supabase
@@ -139,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await fetchProfile(userId);
       }
 
-      return { error: null };
+      return { error: null, userId };
     } catch (err: any) {
       return { error: err };
     }

@@ -5,6 +5,7 @@ import { Shield, Camera, Upload, AlertCircle, Check, Ban } from 'lucide-react';
 import { CameraModal } from '../components/CameraModal';
 import { supabase } from '../lib/supabase';
 import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
+import { uploadKycPhoto } from '../lib/storage';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
@@ -91,21 +92,40 @@ export const Register: React.FC = () => {
 
     setLoading(true);
 
+    // 1. Registrar al usuario en Auth primero, para tener un userId y poder
+    //    subir las fotos a una carpeta propia del usuario en Storage.
     const res = await register({
       ...formData,
       id_card: cleanIdCard,
-      email: cleanEmail,
-      cedula_url: 'adjunto_en_telegram',
-      selfie_url: 'adjunto_en_telegram'
+      email: cleanEmail
     });
 
-    if (res.error) {
+    if (res.error || !res.userId) {
       setLoading(false);
-      setErrorMsg(res.error.message || 'Error registrando el usuario.');
+      setErrorMsg(res.error?.message || 'Error registrando el usuario.');
       return;
     }
 
-    // Enviar fotos y datos a Telegram KYC
+    // 2. Subir las fotos al bucket privado "kyc-photos" (fuente de verdad).
+    //    Si Telegram no está configurado, la foto NO se pierde: ya quedó en Storage.
+    const [cedulaUrl, selfieUrl] = await Promise.all([
+      cedulaPhoto ? uploadKycPhoto(res.userId, 'cedula', cedulaPhoto) : Promise.resolve(null),
+      selfiePhoto ? uploadKycPhoto(res.userId, 'selfie', selfiePhoto) : Promise.resolve(null)
+    ]);
+
+    if (cedulaUrl || selfieUrl) {
+      await supabase
+        .from('profiles')
+        .update({
+          ...(cedulaUrl ? { cedula_url: cedulaUrl } : {}),
+          ...(selfieUrl ? { selfie_url: selfieUrl } : {})
+        })
+        .eq('id', res.userId);
+    }
+
+    // 3. Enviar aviso (y fotos, si el bot está configurado) al canal de Telegram de KYC.
+    //    Esto es solo una notificación adicional; la revisión real la hace el
+    //    admin desde el panel usando las fotos guardadas en Storage.
     try {
       const { data: settings } = await supabase.from('app_settings').select('*');
       const botToken = settings?.find((s: any) => s.key === 'telegram_bot_token')?.value;
