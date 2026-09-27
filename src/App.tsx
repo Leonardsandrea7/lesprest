@@ -1,80 +1,45 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import { RequireAuth, RequireAdmin } from "./components/RequireAuth";
-import { AppLayout } from "./components/AppLayout";
-import { InstallGate } from "./components/InstallGate";
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Navbar } from './components/Navbar';
+import { Dashboard } from './pages/Dashboard';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { Admin } from './pages/Admin';
+import { TelegramBot } from './pages/TelegramBot';
 
-import { Landing } from "./pages/Landing";
-import { Download } from "./pages/Download";
-import { Register } from "./pages/auth/Register";
-import { Login } from "./pages/auth/Login";
+const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
+  const { user, isAdmin, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Cargando PrestApp...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (adminOnly && !isAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
 
-import { Dashboard } from "./pages/app/Dashboard";
-import { LoanFlow } from "./pages/app/LoanFlow";
-import { PaymentsHistory } from "./pages/app/PaymentsHistory";
-import { Progress } from "./pages/app/Progress";
-import { Profile } from "./pages/app/Profile";
-
-import { AdminLayout } from "./pages/admin/AdminLayout";
-import { AdminDashboard } from "./pages/admin/AdminDashboard";
-import { AdminKyc } from "./pages/admin/AdminKyc";
-import { AdminLoans } from "./pages/admin/AdminLoans";
-import { AdminBlacklist } from "./pages/admin/AdminBlacklist";
-import { AdminPayments } from "./pages/admin/AdminPayments";
-import { AdminUsers } from "./pages/admin/AdminUsers";
-import { AdminLevels } from "./pages/admin/AdminLevels";
-import { AdminPaymentMethods } from "./pages/admin/AdminPaymentMethods";
-import { AdminWhatsappMessages } from "./pages/admin/AdminWhatsappMessages";
-import { AdminSettings } from "./pages/admin/AdminSettings";
-
-export default function App() {
+export function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/descargar" element={<Download />} />
-          <Route path="/registro" element={<InstallGate><Register /></InstallGate>} />
-          <Route path="/login" element={<Login />} />
-
-          <Route
-            path="/app"
-            element={
-              <InstallGate>
-                <RequireAuth>
-                  <AppLayout />
-                </RequireAuth>
-              </InstallGate>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="prestamo" element={<LoanFlow />} />
-            <Route path="pagos" element={<PaymentsHistory />} />
-            <Route path="progreso" element={<Progress />} />
-            <Route path="perfil" element={<Profile />} />
-          </Route>
-
-          <Route
-            path="/admin"
-            element={
-              <RequireAdmin>
-                <AdminLayout />
-              </RequireAdmin>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="kyc" element={<AdminKyc />} />
-            <Route path="prestamos" element={<AdminLoans />} />
-            <Route path="lista-negra" element={<AdminBlacklist />} />
-            <Route path="pagos" element={<AdminPayments />} />
-            <Route path="usuarios" element={<AdminUsers />} />
-            <Route path="niveles" element={<AdminLevels />} />
-            <Route path="metodos-pago" element={<AdminPaymentMethods />} />
-            <Route path="mensajes" element={<AdminWhatsappMessages />} />
-            <Route path="configuracion" element={<AdminSettings />} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+          <Navbar />
+          <main className="flex-1 pb-16">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/telegram" element={<TelegramBot />} />
+              <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+          <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+            PrestApp Venezuela — Microcréditos progresivos en Bolívares y Dólares. Operaciones vía Pago Móvil y App Móvil Oficial.
+          </footer>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
+
+export default App;
