@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Camera, Upload, AlertCircle, Check } from 'lucide-react';
+import { Shield, Camera, Upload, AlertCircle, Check, Ban } from 'lucide-react';
 import { CameraModal } from '../components/CameraModal';
 import { supabase } from '../lib/supabase';
 import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
@@ -27,6 +27,7 @@ export const Register: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isBlacklisted, setIsBlacklisted] = useState(false);
 
   const openCamera = (target: 'cedula' | 'selfie') => {
     setCameraTarget(target);
@@ -60,16 +61,40 @@ export const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg('');
+    setIsBlacklisted(false);
+
+    const cleanIdCard = formData.id_card.trim().toUpperCase();
+    const cleanEmail = formData.email.trim().toLowerCase();
+
+    // 1. VALIDAR SI LA CÉDULA O EL CORREO ESTÁN EN LA LISTA NEGRA
+    try {
+      const { data: blacklistedUser } = await supabase
+        .from('black_list')
+        .select('*')
+        .or(`id_card.eq.${cleanIdCard},email.eq.${cleanEmail}`)
+        .maybeSingle();
+
+      if (blacklistedUser) {
+        setIsBlacklisted(true);
+        setErrorMsg('Esta cédula o correo se encuentra bloqueada permanentemente por impago en el sistema. Registro denegado.');
+        return;
+      }
+    } catch (err) {
+      console.warn('Blacklist check error:', err);
+    }
+
     if (!cedulaPhoto || !selfiePhoto) {
       setErrorMsg('Debes tomar la foto de tu cédula y tu selfie biométrica con la cámara.');
       return;
     }
 
     setLoading(true);
-    setErrorMsg('');
 
     const res = await register({
       ...formData,
+      id_card: cleanIdCard,
+      email: cleanEmail,
       cedula_url: 'adjunto_en_telegram',
       selfie_url: 'adjunto_en_telegram'
     });
@@ -87,18 +112,19 @@ export const Register: React.FC = () => {
       const kycChatId = settings?.find((s: any) => s.key === 'telegram_chat_id_kyc')?.value;
 
       if (botToken && kycChatId) {
-        const textMsg = `🆕 <b>NUEVO REGISTRO REAL PRESTAPP</b>\n\n` +
+        const textMsg = `🆕 <b>NUEVO REGISTRO & KYC PRESTAPP</b>\n\n` +
           `👤 <b>Nombre:</b> ${formData.full_name}\n` +
-          `🆔 <b>Cédula:</b> ${formData.id_card}\n` +
+          `🆔 <b>Cédula:</b> ${cleanIdCard}\n` +
           `📱 <b>Teléfono:</b> ${formData.phone}\n` +
-          `✉️ <b>Email:</b> ${formData.email}\n` +
+          `✉️ <b>Email:</b> ${cleanEmail}\n` +
           `🏦 <b>Banco:</b> ${formData.bank_name}\n` +
+          `🛡️ <b>Lista Negra:</b> Limpio\n` +
           `📅 <b>Fecha:</b> ${new Date().toLocaleString('es-VE')}`;
 
         await sendTelegramMessage(botToken, kycChatId, textMsg);
 
         if (cedulaPhoto) {
-          await sendTelegramPhoto(botToken, kycChatId, cedulaPhoto, `🪪 Cédula de ${formData.full_name} (${formData.id_card})`);
+          await sendTelegramPhoto(botToken, kycChatId, cedulaPhoto, `🪪 Cédula de ${formData.full_name} (${cleanIdCard})`);
         }
         if (selfiePhoto) {
           await sendTelegramPhoto(botToken, kycChatId, selfiePhoto, `🤳 Selfie Biométrica de ${formData.full_name}`);
@@ -119,13 +145,23 @@ export const Register: React.FC = () => {
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/30">
             <Shield className="w-6 h-6 text-slate-950 font-black" />
           </div>
-          <h1 className="text-2xl font-black text-white">Registro & KYC PrestApp</h1>
+          <h1 className="text-2xl font-black text-white">Registro Oficial PrestApp</h1>
           <p className="text-xs text-slate-400">
-            Completa tus datos y fotos con la cámara para habilitar tu línea de crédito
+            Completa tus datos con validación contra lista negra de morosidad
           </p>
         </div>
 
-        {errorMsg && (
+        {isBlacklisted && (
+          <div className="p-4 bg-rose-500/20 border-2 border-rose-500/50 rounded-2xl text-xs text-rose-300 flex items-start gap-3">
+            <Ban className="w-6 h-6 shrink-0 text-rose-400 mt-0.5" />
+            <div>
+              <p className="font-black text-sm text-white">USUARIO BLOQUEADO POR IMPAGO</p>
+              <p>Esta cédula de identidad y correo electrónico están registradas en la Lista Negra Oficial de PrestApp por crédito no solventado. No es posible crear una nueva cuenta.</p>
+            </div>
+          </div>
+        )}
+
+        {errorMsg && !isBlacklisted && (
           <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
@@ -296,7 +332,7 @@ export const Register: React.FC = () => {
             disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 mt-4"
           >
-            {loading ? 'Registrando...' : 'Completar Registro'}
+            {loading ? 'Verificando con Lista Negra...' : 'Completar Registro'}
           </button>
         </form>
 
