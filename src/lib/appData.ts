@@ -72,7 +72,10 @@ export const getMyLoans = async (userId: string) => {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    console.error('Error cargando préstamos:', error);
+    return [];
+  }
   return data || [];
 };
 
@@ -82,7 +85,10 @@ export const getMyPayments = async (userId: string) => {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    console.error('Error cargando pagos:', error);
+    return [];
+  }
   return data || [];
 };
 
@@ -93,7 +99,10 @@ export const getMyNotifications = async (userId: string) => {
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(20);
-  if (error) throw error;
+  if (error) {
+    console.error('Error cargando notificaciones:', error);
+    return [];
+  }
   return data || [];
 };
 

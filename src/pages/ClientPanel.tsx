@@ -40,7 +40,8 @@ const statusStyles: Record<string, string> = {
 };
 
 export const ClientPanel: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
+  const [profileStuck, setProfileStuck] = useState(false);
   const [levels, setLevels] = useState<LoanLevel[]>([]);
   const [bcvRate, setBcvRate] = useState(0);
   const [payout, setPayout] = useState<PayoutInfo | null>(null);
@@ -48,6 +49,7 @@ export const ClientPanel: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
@@ -56,6 +58,7 @@ export const ClientPanel: React.FC = () => {
   const loadAll = async () => {
     if (!profile) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const [lv, rate, pay, l, p, n] = await Promise.all([
         getLoanLevels(),
@@ -71,8 +74,9 @@ export const ClientPanel: React.FC = () => {
       setLoans(l);
       setPayments(p);
       setNotifications(n);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setLoadError(err?.message || 'No se pudo cargar tu información. Verifica tu conexión e inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -83,10 +87,43 @@ export const ClientPanel: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
-  if (!profile || loading || levels.length === 0) {
+  useEffect(() => {
+    if (profile) return;
+    const timer = setTimeout(() => setProfileStuck(true), 6000);
+    return () => clearTimeout(timer);
+  }, [profile]);
+
+  if (!profile && profileStuck) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+        <p className="text-sm text-rose-400">
+          No pudimos encontrar tu perfil. Esto puede pasar si tu cuenta quedó incompleta durante el registro.
+        </p>
+        <button onClick={() => logout()} className="px-4 py-2 bg-slate-800 hover:bg-rose-600 text-white font-bold rounded-xl text-xs">
+          Cerrar sesión e intentar de nuevo
+        </button>
+      </div>
+    );
+  }
+
+  if (!profile || loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center text-slate-400 text-sm">
         Cargando tu información...
+      </div>
+    );
+  }
+
+  if (loadError || levels.length === 0) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+        <p className="text-sm text-rose-400">{loadError || 'No pudimos cargar los datos de tu cuenta.'}</p>
+        <button
+          onClick={loadAll}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
