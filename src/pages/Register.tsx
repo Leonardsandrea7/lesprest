@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Camera, Upload, CheckCircle, Smartphone, Send, ArrowRight } from 'lucide-react';
+import { Shield, Camera, Upload, CheckCircle, AlertCircle, Download, Check } from 'lucide-react';
+import { CameraModal } from '../components/CameraModal';
+import { supabase } from '../lib/supabase';
+import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
@@ -13,32 +16,126 @@ export const Register: React.FC = () => {
     phone: '0414-',
     id_card: 'V-',
     bank_name: '0134 - Banesco Banco Universal',
-    telegram_username: '@',
     password: ''
   });
 
-  const [cedulaAttached, setCedulaAttached] = useState(false);
-  const [selfieAttached, setSelfieAttached] = useState(false);
+  const [cedulaPhoto, setCedulaPhoto] = useState<string | null>(null);
+  const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
+
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<'cedula' | 'selfie'>('cedula');
+
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const openCamera = (target: 'cedula' | 'selfie') => {
+    setCameraTarget(target);
+    setCameraModalOpen(true);
+  };
+
+  const handleCapture = (base64Image: string) => {
+    if (cameraTarget === 'cedula') {
+      setCedulaPhoto(base64Image);
+    } else {
+      setSelfiePhoto(base64Image);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'cedula' | 'selfie') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          if (target === 'cedula') {
+            setCedulaPhoto(reader.result);
+          } else {
+            setSelfiePhoto(reader.result);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cedulaPhoto || !selfiePhoto) {
+      setErrorMsg('Debes tomar o subir la foto de tu cédula y tu selfie biométrica.');
+      return;
+    }
+
     setLoading(true);
-    await register(formData);
+    setErrorMsg('');
+
+    // Register user in Supabase
+    const res = await register({
+      ...formData,
+      cedula_url: cedulaPhoto ? 'adjunto_en_telegram' : null,
+      selfie_url: selfiePhoto ? 'adjunto_en_telegram' : null
+    });
+
+    if (res.error) {
+      setLoading(false);
+      setErrorMsg(res.error.message || 'Error registrando el usuario en Supabase.');
+      return;
+    }
+
+    // Send KYC notifications and photos to Telegram Registration Channel
+    try {
+      const { data: settings } = await supabase
+        .from('app_settings')
+        .select('*');
+
+      const botToken = settings?.find((s: any) => s.key === 'telegram_bot_token')?.value;
+      const kycChatId = settings?.find((s: any) => s.key === 'telegram_chat_id_kyc')?.value;
+
+      if (botToken && kycChatId) {
+        const textMsg = `🆕 <b>NUEVO REGISTRO & KYC PRESTAPP</b>\n\n` +
+          `👤 <b>Nombre:</b> ${formData.full_name}\n` +
+          `🆔 <b>Cédula:</b> ${formData.id_card}\n` +
+          `📱 <b>Teléfono:</b> ${formData.phone}\n` +
+          `✉️ <b>Email:</b> ${formData.email}\n` +
+          `🏦 <b>Banco:</b> ${formData.bank_name}\n` +
+          `📅 <b>Fecha:</b> ${new Date().toLocaleString('es-VE')}\n\n` +
+          `<i>A continuación se adjuntan la foto de la cédula y la selfie biométrica.</i>`;
+
+        await sendTelegramMessage(botToken, kycChatId, textMsg);
+
+        if (cedulaPhoto) {
+          await sendTelegramPhoto(botToken, kycChatId, cedulaPhoto, `🪪 Cédula de ${formData.full_name} (${formData.id_card})`);
+        }
+        if (selfiePhoto) {
+          await sendTelegramPhoto(botToken, kycChatId, selfiePhoto, `🤳 Selfie Biométrica de ${formData.full_name}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Telegram notification error:', err);
+    }
+
     setLoading(false);
     navigate('/dashboard');
   };
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-8">
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/30">
             <Shield className="w-6 h-6 text-slate-950 font-black" />
           </div>
-          <h1 className="text-2xl font-black text-white">Registro & KYC PrestApp</h1>
-          <p className="text-xs text-slate-400">Verifica tu identidad con cédula y selfie biométrica para habilitar tu crédito</p>
+          <h1 className="text-2xl font-black text-white">Registro & Verificación KYC</h1>
+          <p className="text-xs text-slate-400">
+            Toma la foto de tu cédula y selfie biométrica con la cámara para activar tu cuenta
+          </p>
         </div>
+
+        {errorMsg && (
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -47,7 +144,7 @@ export const Register: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="Carlos Mendoza"
+                placeholder="Nombre y Apellido"
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
@@ -59,7 +156,7 @@ export const Register: React.FC = () => {
               <input
                 type="email"
                 required
-                placeholder="carlos@correo.com"
+                placeholder="usuario@correo.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
@@ -73,7 +170,7 @@ export const Register: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="V-27819340"
+                placeholder="V-28123456"
                 value={formData.id_card}
                 onChange={(e) => setFormData({ ...formData, id_card: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
@@ -85,7 +182,7 @@ export const Register: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="0414-9876543"
+                placeholder="0414-1234567"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
@@ -109,18 +206,6 @@ export const Register: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-300 block mb-1">Usuario de Telegram (@)</label>
-            <input
-              type="text"
-              placeholder="@mi_usuario_telegram"
-              value={formData.telegram_username}
-              onChange={(e) => setFormData({ ...formData, telegram_username: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">Conectará tu cuenta al bot oficial @PrestAppBot</p>
-          </div>
-
-          <div>
             <label className="text-xs font-bold text-slate-300 block mb-1">Contraseña</label>
             <input
               type="password"
@@ -132,34 +217,105 @@ export const Register: React.FC = () => {
             />
           </div>
 
-          {/* KYC PHOTO & SELFIE BIOMETRICS */}
-          <div className="pt-3 border-t border-slate-800 space-y-3">
-            <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider">Verificación Biométrica Requerida</h4>
-            
+          {/* KYC Fields with Camera Launcher */}
+          <div className="pt-4 border-t border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider">
+                Verificación Biométrica KYC en Vivo
+              </h4>
+              <span className="text-[10px] text-slate-400">Fotos requeridas</span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Foto Cédula */}
               <div
-                onClick={() => setCedulaAttached(!cedulaAttached)}
-                className={`p-4 rounded-2xl border cursor-pointer transition flex items-center space-x-3 ${
-                  cedulaAttached ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                className={`p-4 rounded-2xl border transition flex flex-col justify-between ${
+                  cedulaPhoto
+                    ? 'bg-emerald-950/30 border-emerald-500/60'
+                    : 'bg-slate-950 border-slate-800'
                 }`}
               >
-                <Upload className="w-5 h-5 shrink-0" />
-                <div className="text-left">
-                  <p className="text-xs font-bold text-white">{cedulaAttached ? '✓ Cédula Cargada' : 'Subir Foto Cédula'}</p>
-                  <p className="text-[10px] text-slate-400">Frontal legible</p>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                      {cedulaPhoto ? <Check className="w-4 h-4 text-emerald-400" /> : <Camera className="w-4 h-4 text-blue-400" />}
+                      <span>Foto de Cédula</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400">Documento legible sin reflejo</p>
+                  </div>
+                  {cedulaPhoto && (
+                    <img
+                      src={cedulaPhoto}
+                      alt="Cédula"
+                      className="w-12 h-12 object-cover rounded-lg border border-emerald-500/40"
+                    />
+                  )}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openCamera('cedula')}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{cedulaPhoto ? 'Cambiar' : 'Abrir Cámara'}</span>
+                  </button>
+                  <label className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Subir archivo">
+                    <Upload className="w-3.5 h-3.5" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'cedula')}
+                    />
+                  </label>
                 </div>
               </div>
 
+              {/* Selfie Biométrica */}
               <div
-                onClick={() => setSelfieAttached(!selfieAttached)}
-                className={`p-4 rounded-2xl border cursor-pointer transition flex items-center space-x-3 ${
-                  selfieAttached ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                className={`p-4 rounded-2xl border transition flex flex-col justify-between ${
+                  selfiePhoto
+                    ? 'bg-emerald-950/30 border-emerald-500/60'
+                    : 'bg-slate-950 border-slate-800'
                 }`}
               >
-                <Camera className="w-5 h-5 shrink-0" />
-                <div className="text-left">
-                  <p className="text-xs font-bold text-white">{selfieAttached ? '✓ Selfie Biométrica OK' : 'Capturar Selfie Facial'}</p>
-                  <p className="text-[10px] text-slate-400">Prueba de vida</p>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                      {selfiePhoto ? <Check className="w-4 h-4 text-emerald-400" /> : <Camera className="w-4 h-4 text-blue-400" />}
+                      <span>Selfie Facial</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400">Rostro frontal iluminado</p>
+                  </div>
+                  {selfiePhoto && (
+                    <img
+                      src={selfiePhoto}
+                      alt="Selfie"
+                      className="w-12 h-12 object-cover rounded-lg border border-emerald-500/40"
+                    />
+                  )}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openCamera('selfie')}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{selfiePhoto ? 'Cambiar' : 'Abrir Cámara'}</span>
+                  </button>
+                  <label className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Subir archivo">
+                    <Upload className="w-3.5 h-3.5" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'selfie')}
+                    />
+                  </label>
                 </div>
               </div>
             </div>
@@ -170,7 +326,7 @@ export const Register: React.FC = () => {
             disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 mt-4"
           >
-            {loading ? 'Creando tu cuenta...' : 'Completar Registro y Activar PrestApp'}
+            {loading ? 'Procesando registro en Supabase...' : 'Completar Registro'}
           </button>
         </form>
 
@@ -181,6 +337,15 @@ export const Register: React.FC = () => {
           </Link>
         </p>
       </div>
+
+      {/* Modal de Cámara */}
+      <CameraModal
+        title={cameraTarget === 'cedula' ? 'Captura de Foto de Cédula' : 'Selfie Biométrica Facial'}
+        isOpen={cameraModalOpen}
+        onClose={() => setCameraModalOpen(false)}
+        onCapture={handleCapture}
+        preferredFacingMode={cameraTarget === 'selfie' ? 'user' : 'environment'}
+      />
     </div>
   );
 };

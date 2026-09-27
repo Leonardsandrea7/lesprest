@@ -6,11 +6,19 @@ import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Admin } from './pages/Admin';
-import { TelegramBot } from './pages/TelegramBot';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
   const { user, isAdmin, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Cargando PrestApp...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs">Cargando cuenta PrestApp...</p>
+        </div>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && !isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
@@ -28,13 +36,12 @@ export function App() {
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/telegram" element={<TelegramBot />} />
               <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
           <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-            PrestApp Venezuela — Microcréditos progresivos en Bolívares y Dólares. Operaciones vía Pago Móvil y App Móvil Oficial.
+            PrestApp Venezuela — Microcréditos progresivos en Bolívares y Dólares. Operaciones y solicitudes exclusivas desde la App Oficial Android.
           </footer>
         </div>
       </BrowserRouter>

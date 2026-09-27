@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Lock, Mail, ArrowRight, Smartphone, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Mail, ArrowRight, AlertCircle, Download } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,12 +15,14 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
-    const { error } = await login(email, password);
+
+    const res = await login(email, password);
     setLoading(false);
-    if (error) {
-      setErrorMsg('Credenciales inválidas o error de conexión.');
+
+    if (res.error) {
+      setErrorMsg(res.error.message || 'Credenciales inválidas. Verifica tu correo y contraseña.');
     } else {
-      if (email.toLowerCase().includes('admin')) {
+      if (res.profile?.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
@@ -28,23 +30,15 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleDemo = (type: 'cliente' | 'admin') => {
-    if (type === 'admin') {
-      login('admin@prestapp.com', 'admin123').then(() => navigate('/admin'));
-    } else {
-      login('carlos.mendoza@email.com', 'pass123').then(() => navigate('/dashboard'));
-    }
-  };
-
   return (
-    <div className="max-w-md mx-auto px-4 py-12">
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="max-w-md mx-auto px-4 py-12 space-y-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-600/30">
             <Shield className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-black text-white">Iniciar Sesión en PrestApp</h1>
-          <p className="text-xs text-slate-400">Accede a tu microcrédito y récord de pagos</p>
+          <h1 className="text-2xl font-black text-white">Ingresar a PrestApp</h1>
+          <p className="text-xs text-slate-400">Accede a tu cuenta de microcréditos</p>
         </div>
 
         {errorMsg && (
@@ -90,35 +84,29 @@ export const Login: React.FC = () => {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30"
           >
-            <span>{loading ? 'Accediendo...' : 'Entrar a PrestApp'}</span>
+            <span>{loading ? 'Verificando en Supabase...' : 'Iniciar Sesión'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="pt-4 border-t border-slate-800 space-y-3">
-          <p className="text-[11px] text-slate-400 text-center font-medium">Accesos rápidos de demostración:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleDemo('cliente')}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition"
-            >
-              Demo Cliente
-            </button>
-            <button
-              onClick={() => handleDemo('admin')}
-              className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-bold text-amber-400 border border-amber-500/30 rounded-xl transition"
-            >
-              Demo Admin (Supabase)
-            </button>
-          </div>
-        </div>
-
-        <p className="text-center text-xs text-slate-400">
-          ¿No tienes cuenta?{' '}
+        <p className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800">
+          ¿Aún no tienes cuenta?{' '}
           <Link to="/register" className="text-blue-400 font-bold hover:underline">
-            Regístrate con KYC
+            Regístrate aquí
           </Link>
         </p>
+      </div>
+
+      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs">
+        <span className="text-slate-400">¿Deseas solicitar un préstamo?</span>
+        <a
+          href="/prestapp.apk"
+          download
+          className="inline-flex items-center space-x-1.5 font-bold text-emerald-400 hover:text-emerald-300"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Descargar App Android</span>
+        </a>
       </div>
     </div>
   );

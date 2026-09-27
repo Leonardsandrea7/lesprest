@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Smartphone, Send, User, LogOut, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Shield, Download, LogOut, ShieldCheck, User } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, profile, isAdmin, logout } = useAuth();
@@ -19,66 +19,68 @@ export const Navbar: React.FC = () => {
               <span className="text-xl font-black tracking-tight text-white">PrestApp</span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">VE</span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">Tu microcrédito seguro</p>
+            <p className="text-[11px] text-slate-400 font-medium">Microcréditos seguros</p>
           </div>
         </Link>
 
-        {user ? (
-          <nav className="flex items-center space-x-3">
-            <Link
-              to="/dashboard"
-              className="text-sm font-semibold text-slate-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition"
-            >
-              Dashboard
-            </Link>
+        <div className="flex items-center space-x-3">
+          {/* Always prominent App Download button */}
+          <a
+            href="/prestapp.apk"
+            download="PrestApp-Oficial.apk"
+            className="flex items-center space-x-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-2 rounded-xl transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Descargar App</span>
+          </a>
 
-            <Link
-              to="/telegram"
-              className="hidden sm:flex items-center space-x-1.5 text-sm font-semibold text-sky-400 hover:text-sky-300 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 transition"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>@PrestAppBot</span>
-            </Link>
-
-            {isAdmin && (
+          {user ? (
+            <nav className="flex items-center space-x-2">
               <Link
-                to="/admin"
-                className="flex items-center space-x-1.5 text-sm font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg hover:bg-amber-500/20 transition"
+                to="/dashboard"
+                className="text-xs font-semibold text-slate-200 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800 transition"
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Panel Admin</span>
+                Mi Cuenta
               </Link>
-            )}
 
-            <div className="flex items-center space-x-2 pl-2 border-l border-slate-800">
-              <span className="text-xs text-slate-400 hidden md:inline">
-                {profile?.full_name?.split(' ')[0]}
-              </span>
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="flex items-center space-x-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-xl hover:bg-amber-500/20 transition"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Panel Admin</span>
+                </Link>
+              )}
+
               <button
-                onClick={() => { logout(); navigate('/login'); }}
+                onClick={async () => {
+                  await logout();
+                  navigate('/login');
+                }}
                 title="Cerrar Sesión"
                 className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
               >
                 <LogOut className="w-4 h-4" />
               </button>
+            </nav>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/login"
+                className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800 transition"
+              >
+                Iniciar Sesión
+              </Link>
+              <Link
+                to="/register"
+                className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-3.5 py-2 rounded-xl shadow-lg shadow-blue-600/30 transition"
+              >
+                Registro
+              </Link>
             </div>
-          </nav>
-        ) : (
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/login"
-              className="text-sm font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-lg"
-            >
-              Iniciar Sesión
-            </Link>
-            <Link
-              to="/register"
-              className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl shadow-lg shadow-blue-600/30 transition"
-            >
-              Registrarme (KYC)
-            </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );
