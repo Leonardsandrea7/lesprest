@@ -71,6 +71,27 @@ Desde `/admin`, por pestañas:
 
 Las notificaciones push nativas (que llegan aunque el celular tenga la app cerrada) dependen de Firebase Cloud Messaging integrado directamente en el **APK Android**, que es un proyecto aparte de este código web — como mencionaste que la APK ya las trae, no hay nada que tocar ahí desde este repositorio web. Lo que sí construí en la web es el equivalente dentro de la app: la campanita de **Notificaciones** en el Dashboard del cliente (avisos de aprobación de préstamo, pago aprobado, KYC verificado, etc.), que se generan automáticamente cada vez que el admin hace esas acciones.
 
-## 9. Modelo de negocio (para que quede explícito)
+## 10. Tu app ahora es instalable (PWA) — y cómo sacar un .apk real de ahí
+
+Le agregué todo lo necesario para que deje de ser "solo una web" y se sienta una app de verdad:
+- Ícono propio con tus colores exactos (`public/icons/`), en todos los tamaños que pide Android e iOS.
+- `manifest.json`: nombre, colores de marca, pantalla completa sin barra de navegador (`display: standalone`).
+- Service Worker (`public/service-worker.js`): carga instantánea en visitas repetidas y una pantalla básica si se pierde la conexión — nunca cachea Supabase ni `/api/*`, así que tus datos siempre son en tiempo real.
+- Banner de "Instalar App" que aparece solo en Android/Chrome cuando el navegador detecta que la web cumple los requisitos de instalación.
+
+### Cómo probarlo
+1. Despliega en Vercel (ya lo tienes en HTTPS, requisito obligatorio para PWA).
+2. Ábrelo en Chrome de un Android real → te debería aparecer el banner azul de "Instalar PrestApp", o el menú ⋮ de Chrome → "Instalar app" / "Agregar a pantalla de inicio".
+3. Una vez instalada, abre igual que cualquier app: ícono en el launcher, pantalla completa, sin barra de direcciones.
+
+### Cómo sacar un .apk real e instalable (para repartir el archivo o subir a Play Store)
+1. Ve a **https://www.pwabuilder.com**
+2. Pega la URL de tu Vercel (ej. `https://tu-proyecto.vercel.app`) y dale "Start".
+3. Te va a analizar el manifest/service worker (deberían salir en verde gracias a lo que ya dejé listo) y te deja elegir **Android** → genera un paquete con un **.apk** y un **.aab** (este último es el que pide Play Store) ya firmados y listos para instalar/publicar.
+4. Ese .apk sí es 100% real, compilado con su infraestructura — ya no depende de mí ni de este chat.
+
+Si en el futuro quieres una app 100% nativa (Kotlin, con acceso a cámara/notificaciones push nativas de verdad, etc.) en vez de esta PWA empaquetada, es un proyecto Android aparte que sí necesitaría Android Studio de tu lado — pero para lanzar rápido y que tus clientes ya puedan instalarla hoy, este camino es el más confiable.
+
+## 11. Modelo de negocio (para que quede explícito)
 
 Este sistema sigue el modelo de "Pago Móvil manual": el cliente transfiere por su cuenta a tu número/banco (mostrado en pantalla) y luego reporta el número de referencia en la app; tú lo concilias manualmente desde Admin. No es una pasarela de pago automática (Stripe, PayPal, etc.) — si más adelante quieres eso, es un proyecto aparte con implicaciones legales/regulatorias en Venezuela que vale la pena evaluar con calma.
