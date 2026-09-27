@@ -1,56 +1,68 @@
 import { supabase } from './supabase';
 
-export interface AppSettings {
-  bcv_rate: number;
-  level1_max_amount: number;
-  level1_rate_percent: number;
-  level1_installments: number;
-  level1_interval_days: number;
+export interface LoanLevel {
+  level: number;
+  max_amount_usd: number;
+  rate_percent: number;
+  installments: number;
+  interval_days: number;
+  payments_to_advance: number;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
-  bcv_rate: 54.25,
-  level1_max_amount: 1,
-  level1_rate_percent: 6,
-  level1_installments: 1,
-  level1_interval_days: 10
+export interface PayoutInfo {
+  bank_name: string;
+  phone: string;
+  id_card: string;
+  holder_name: string;
+}
+
+export const MAX_LEVEL = 6;
+
+export const getLoanLevels = async (): Promise<LoanLevel[]> => {
+  const { data, error } = await supabase.from('loan_levels').select('*').order('level', { ascending: true });
+  if (error || !data || data.length === 0) {
+    // Respaldo mínimo por si la tabla aún no fue migrada (evita que la app se rompa)
+    return [{ level: 1, max_amount_usd: 1, rate_percent: 6, installments: 1, interval_days: 10, payments_to_advance: 2 }];
+  }
+  return data as LoanLevel[];
 };
 
-export const getSettings = async (): Promise<AppSettings> => {
-  const { data } = await supabase.from('app_settings').select('*');
-  const settings = { ...DEFAULT_SETTINGS };
-  data?.forEach((s: any) => {
-    if (s.key === 'bcv_rate') settings.bcv_rate = parseFloat(s.value) || settings.bcv_rate;
-    if (s.key === 'level1_max_amount') settings.level1_max_amount = parseFloat(s.value) || settings.level1_max_amount;
-    if (s.key === 'level1_rate_percent') settings.level1_rate_percent = parseFloat(s.value) || settings.level1_rate_percent;
-    if (s.key === 'level1_installments') settings.level1_installments = parseFloat(s.value) || settings.level1_installments;
-    if (s.key === 'level1_interval_days') settings.level1_interval_days = parseFloat(s.value) || settings.level1_interval_days;
-  });
-  return settings;
+export const getBcvRate = async (): Promise<number> => {
+  const { data } = await supabase.from('app_settings').select('value').eq('key', 'bcv_rate').maybeSingle();
+  return data ? parseFloat(data.value) || 54.25 : 54.25;
 };
 
-/**
- * Calcula el monto disponible para un nivel dado.
- * NOTA / LIMITACIÓN CONOCIDA: hoy en Admin solo se configuran los parámetros
- * del Nivel 1. Mientras no exista una tabla/pantalla de "niveles" independiente,
- * se usa una regla simple de crecimiento (se duplica el monto por cada nivel
- * alcanzado) manteniendo el mismo % de interés, cuotas y plazo del Nivel 1.
- * Cuando quieras ofrecer montos/plazos distintos por nivel, lo correcto es
- * agregar una tabla `loan_levels` y un formulario en Admin para editarla.
- */
-export const calcLoanForLevel = (settings: AppSettings, level: number) => {
-  const amountUsd = Number((settings.level1_max_amount * Math.pow(2, Math.max(level, 1) - 1)).toFixed(2));
-  const interestUsd = Number((amountUsd * (settings.level1_rate_percent / 100)).toFixed(2));
+export const getPayoutInfo = async (): Promise<PayoutInfo> => {
+  const { data } = await supabase
+    .from('app_settings')
+    .select('*')
+    .in('key', ['payout_bank_name', 'payout_phone', 'payout_id_card', 'payout_holder_name']);
+
+  const map: Record<string, string> = {};
+  data?.forEach((s: any) => (map[s.key] = s.value));
+
+  return {
+    bank_name: map.payout_bank_name || 'Por definir',
+    phone: map.payout_phone || 'Por definir',
+    id_card: map.payout_id_card || 'Por definir',
+    holder_name: map.payout_holder_name || 'PrestApp'
+  };
+};
+
+export const calcLoanForLevel = (level: LoanLevel, bcvRate: number) => {
+  const amountUsd = Number(level.max_amount_usd);
+  const interestUsd = Number((amountUsd * (level.rate_percent / 100)).toFixed(2));
   const totalDueUsd = Number((amountUsd + interestUsd).toFixed(2));
-  const amountVes = Number((amountUsd * settings.bcv_rate).toFixed(2));
-  const totalDueVes = Number((totalDueUsd * settings.bcv_rate).toFixed(2));
+  const amountVes = Number((amountUsd * bcvRate).toFixed(2));
+  const totalDueVes = Number((totalDueUsd * bcvRate).toFixed(2));
   return {
     amountUsd,
     interestUsd,
     totalDueUsd,
     amountVes,
     totalDueVes,
-    termDays: settings.level1_interval_days
+    termDays: level.interval_days,
+    installments: level.installments
   };
 };
 
@@ -90,10 +102,10 @@ export const markNotificationRead = async (id: string) => {
 };
 
 const ACTIVE_LOAN_STATUSES = ['pendiente', 'aprobado', 'desembolsado'];
+export const hasActiveLoan = (loans: any[]) => loans.some((l) => ACTIVE_LOAN_STATUSES.includes(l.status));
 
-export const requestLoan = async (userId: string, level: number) => {
-  const settings = await getSettings();
-  const calc = calcLoanForLevel(settings, level);
+export const requestLoan = async (userId: string, level: LoanLevel, bcvRate: number) => {
+  const calc = calcLoanForLevel(level, bcvRate);
   const dueDate = new Date(Date.now() + calc.termDays * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
@@ -106,9 +118,10 @@ export const requestLoan = async (userId: string, level: number) => {
         interest_usd: calc.interestUsd,
         total_due_usd: calc.totalDueUsd,
         total_due_ves: calc.totalDueVes,
-        bcv_rate: settings.bcv_rate,
-        level_borrowed: level,
+        bcv_rate: bcvRate,
+        level_borrowed: level.level,
         term_days: calc.termDays,
+        installments: calc.installments,
         due_date: dueDate,
         status: 'pendiente'
       }
@@ -119,8 +132,6 @@ export const requestLoan = async (userId: string, level: number) => {
   if (error) throw error;
   return data;
 };
-
-export const hasActiveLoan = (loans: any[]) => loans.some((l) => ACTIVE_LOAN_STATUSES.includes(l.status));
 
 export const reportPayment = async (
   userId: string,
@@ -147,4 +158,12 @@ export const reportPayment = async (
 
   if (error) throw error;
   return data;
+};
+
+export const updateMyProfile = async (
+  userId: string,
+  fields: { full_name?: string; phone?: string; bank_name?: string }
+) => {
+  const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
+  if (error) throw error;
 };

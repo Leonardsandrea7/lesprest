@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Shield, Camera, Upload, AlertCircle, Check, Ban } from 'lucide-react';
 import { CameraModal } from '../components/CameraModal';
 import { supabase } from '../lib/supabase';
-import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
+import { notify } from '../lib/notify';
 import { uploadKycPhoto } from '../lib/storage';
 
 export const Register: React.FC = () => {
@@ -123,32 +123,26 @@ export const Register: React.FC = () => {
         .eq('id', res.userId);
     }
 
-    // 3. Enviar aviso (y fotos, si el bot está configurado) al canal de Telegram de KYC.
+    // 3. Enviar aviso (y fotos) al bot de Telegram dedicado a Registro/KYC.
     //    Esto es solo una notificación adicional; la revisión real la hace el
     //    admin desde el panel usando las fotos guardadas en Storage.
     try {
-      const { data: settings } = await supabase.from('app_settings').select('*');
-      const botToken = settings?.find((s: any) => s.key === 'telegram_bot_token')?.value;
-      const kycChatId = settings?.find((s: any) => s.key === 'telegram_chat_id_kyc')?.value;
+      const textMsg = `🆕 <b>NUEVO REGISTRO & KYC PRESTAPP</b>\n\n` +
+        `👤 <b>Nombre:</b> ${formData.full_name}\n` +
+        `🆔 <b>Cédula:</b> ${cleanIdCard}\n` +
+        `📱 <b>Teléfono:</b> ${formData.phone}\n` +
+        `✉️ <b>Email:</b> ${cleanEmail}\n` +
+        `🏦 <b>Banco:</b> ${formData.bank_name}\n` +
+        `🛡️ <b>Lista Negra:</b> Limpio\n` +
+        `📅 <b>Fecha:</b> ${new Date().toLocaleString('es-VE')}`;
 
-      if (botToken && kycChatId) {
-        const textMsg = `🆕 <b>NUEVO REGISTRO & KYC PRESTAPP</b>\n\n` +
-          `👤 <b>Nombre:</b> ${formData.full_name}\n` +
-          `🆔 <b>Cédula:</b> ${cleanIdCard}\n` +
-          `📱 <b>Teléfono:</b> ${formData.phone}\n` +
-          `✉️ <b>Email:</b> ${cleanEmail}\n` +
-          `🏦 <b>Banco:</b> ${formData.bank_name}\n` +
-          `🛡️ <b>Lista Negra:</b> Limpio\n` +
-          `📅 <b>Fecha:</b> ${new Date().toLocaleString('es-VE')}`;
+      await notify({ channel: 'kyc', text: textMsg });
 
-        await sendTelegramMessage(botToken, kycChatId, textMsg);
-
-        if (cedulaPhoto) {
-          await sendTelegramPhoto(botToken, kycChatId, cedulaPhoto, `🪪 Cédula de ${formData.full_name} (${cleanIdCard})`);
-        }
-        if (selfiePhoto) {
-          await sendTelegramPhoto(botToken, kycChatId, selfiePhoto, `🤳 Selfie Biométrica de ${formData.full_name}`);
-        }
+      if (cedulaPhoto) {
+        await notify({ channel: 'kyc', photoBase64: cedulaPhoto, photoCaption: `🪪 Cédula de ${formData.full_name} (${cleanIdCard})` });
+      }
+      if (selfiePhoto) {
+        await notify({ channel: 'kyc', photoBase64: selfiePhoto, photoCaption: `🤳 Selfie Biométrica de ${formData.full_name}` });
       }
     } catch (err) {
       console.warn(err);

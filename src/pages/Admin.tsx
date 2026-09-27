@@ -1,51 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { 
-  ShieldCheck, 
-  CheckCircle, 
-  RefreshCw, 
-  Send, 
-  Bell, 
-  Newspaper, 
-  DollarSign, 
-  Settings,
-  Sparkles,
+import React, { useEffect, useState } from 'react';
+import {
+  ShieldCheck,
   Users,
-  Sliders,
-  Calendar,
-  Layers,
-  Ban,
-  Trash2,
+  Wallet,
   ShieldQuestion,
-  XCircle
+  Ban,
+  Settings,
+  LifeBuoy,
+  CheckCircle,
+  XCircle,
+  Trash2,
+  LogOut,
+  Send,
+  Sliders,
+  Landmark,
+  Bot
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { sendTelegramMessage } from '../lib/telegram';
+import { notify } from '../lib/notify';
+
+type Tab = 'usuarios' | 'prestamos' | 'kyc' | 'blacklist' | 'soporte' | 'config';
+
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'usuarios', label: 'Usuarios', icon: <Users className="w-4 h-4" /> },
+  { id: 'prestamos', label: 'Préstamos y Pagos', icon: <Wallet className="w-4 h-4" /> },
+  { id: 'kyc', label: 'KYC', icon: <ShieldQuestion className="w-4 h-4" /> },
+  { id: 'blacklist', label: 'Lista Negra', icon: <Ban className="w-4 h-4" /> },
+  { id: 'soporte', label: 'Soporte', icon: <LifeBuoy className="w-4 h-4" /> },
+  { id: 'config', label: 'Configuración', icon: <Settings className="w-4 h-4" /> }
+];
+
+const KYC_BADGE: Record<string, string> = {
+  verificado: 'bg-emerald-500/20 text-emerald-400',
+  rechazado: 'bg-rose-500/20 text-rose-400',
+  en_revision: 'bg-amber-500/20 text-amber-400',
+  no_verificado: 'bg-slate-700 text-slate-300'
+};
 
 export const Admin: React.FC = () => {
-  const { profile } = useAuth();
-  const [bcvRate, setBcvRate] = useState(54.25);
-  const [rateInput, setRateInput] = useState('54.25');
-
-  // Configuración Nivel 1 ($1 USD por defecto, 2 pagos a tiempo para avanzar)
-  const [l1MaxAmount, setL1MaxAmount] = useState('1');
-  const [l1RatePercent, setL1RatePercent] = useState('6');
-  const [l1Installments, setL1Installments] = useState('1');
-  const [l1IntervalDays, setL1IntervalDays] = useState('10');
-
-  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
-  const [pendingLoans, setPendingLoans] = useState<any[]>([]);
-  const [blacklist, setBlacklist] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
+  const { profile, logout } = useAuth();
+  const [tab, setTab] = useState<Tab>('usuarios');
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
 
-  // Telegram Config
-  const [botToken, setBotToken] = useState('');
-  const [chatIdKyc, setChatIdKyc] = useState('');
-  const [chatIdOps, setChatIdOps] = useState('');
+  const [clients, setClients] = useState<any[]>([]);
+  const [loans, setLoans] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [blacklist, setBlacklist] = useState<any[]>([]);
+  const [levels, setLevels] = useState<any[]>([]);
+  const [supportMessages, setSupportMessages] = useState<any[]>([]);
+  const [selectedSupportUser, setSelectedSupportUser] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
-  // Lista negra input
+  // Config: tasa BCV, pago móvil, bots
+  const [rateInput, setRateInput] = useState('54.25');
+  const [payout, setPayout] = useState({ payout_bank_name: '', payout_phone: '', payout_id_card: '', payout_holder_name: '' });
+  const [secrets, setSecrets] = useState({
+    telegram_ops_bot_token: '',
+    telegram_ops_chat_id: '',
+    telegram_kyc_bot_token: '',
+    telegram_kyc_chat_id: '',
+    telegram_support_bot_token: '',
+    telegram_support_chat_id: ''
+  });
+
+  // Lista negra: formulario
   const [blockIdCard, setBlockIdCard] = useState('');
   const [blockEmail, setBlockEmail] = useState('');
   const [blockPhone, setBlockPhone] = useState('');
@@ -54,59 +74,49 @@ export const Admin: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Payments
-      const { data: paymentsData } = await supabase
-        .from('payments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (paymentsData) setPendingPayments(paymentsData);
-
-      // 2. Loans
-      const { data: loansData } = await supabase
-        .from('loans')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (loansData) setPendingLoans(loansData);
-
-      // 3. Blacklist
-      const { data: blacklistData } = await supabase
-        .from('black_list')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (blacklistData) setBlacklist(blacklistData);
-
-      // 3b. Clientes (para revisión de KYC)
-      const { data: clientsData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'cliente')
-        .order('created_at', { ascending: false });
+      const [
+        { data: clientsData },
+        { data: loansData },
+        { data: paymentsData },
+        { data: blacklistData },
+        { data: levelsData },
+        { data: settingsData },
+        { data: secretsData },
+        { data: supportData }
+      ] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('loans').select('*').order('created_at', { ascending: false }),
+        supabase.from('payments').select('*').order('created_at', { ascending: false }),
+        supabase.from('black_list').select('*').order('created_at', { ascending: false }),
+        supabase.from('loan_levels').select('*').order('level', { ascending: true }),
+        supabase.from('app_settings').select('*'),
+        supabase.from('app_secrets').select('*'),
+        supabase.from('support_messages').select('*').order('created_at', { ascending: true })
+      ]);
 
       if (clientsData) setClients(clientsData);
-
-      // 4. Settings
-      const { data: settingsData } = await supabase
-        .from('app_settings')
-        .select('*');
+      if (loansData) setLoans(loansData);
+      if (paymentsData) setPayments(paymentsData);
+      if (blacklistData) setBlacklist(blacklistData);
+      if (levelsData) setLevels(levelsData);
+      if (supportData) setSupportMessages(supportData);
 
       if (settingsData) {
-        settingsData.forEach((s: any) => {
-          if (s.key === 'bcv_rate') {
-            setBcvRate(parseFloat(s.value));
-            setRateInput(s.value);
-          }
-          if (s.key === 'level1_max_amount') setL1MaxAmount(s.value);
-          if (s.key === 'level1_rate_percent') setL1RatePercent(s.value);
-          if (s.key === 'level1_installments') setL1Installments(s.value);
-          if (s.key === 'level1_interval_days') setL1IntervalDays(s.value);
-
-          if (s.key === 'telegram_bot_token') setBotToken(s.value);
-          if (s.key === 'telegram_chat_id_kyc') setChatIdKyc(s.value);
-          if (s.key === 'telegram_chat_id_operations') setChatIdOps(s.value);
+        const map: Record<string, string> = {};
+        settingsData.forEach((s: any) => (map[s.key] = s.value));
+        if (map.bcv_rate) setRateInput(map.bcv_rate);
+        setPayout({
+          payout_bank_name: map.payout_bank_name || '',
+          payout_phone: map.payout_phone || '',
+          payout_id_card: map.payout_id_card || '',
+          payout_holder_name: map.payout_holder_name || ''
         });
+      }
+
+      if (secretsData) {
+        const smap: any = {};
+        secretsData.forEach((s: any) => (smap[s.key] = s.value));
+        setSecrets((prev) => ({ ...prev, ...smap }));
       }
     } catch (err) {
       console.error(err);
@@ -119,142 +129,79 @@ export const Admin: React.FC = () => {
     loadData();
   }, []);
 
-  const saveSettings = async () => {
+  // ---------------------------------------------------------------------
+  // USUARIOS
+  // ---------------------------------------------------------------------
+  const saveClient = async (id: string, fields: any) => {
     try {
-      await supabase.from('app_settings').upsert([
-        { key: 'telegram_bot_token', value: botToken },
-        { key: 'telegram_chat_id_kyc', value: chatIdKyc },
-        { key: 'telegram_chat_id_operations', value: chatIdOps }
-      ]);
-      setMsg('Configuración de canales de Telegram guardada correctamente.');
-    } catch {
-      setMsg('Error guardando configuración.');
-    }
-  };
-
-  const handleSaveLoanRules = async () => {
-    try {
-      await supabase.from('app_settings').upsert([
-        { key: 'level1_max_amount', value: l1MaxAmount },
-        { key: 'level1_rate_percent', value: l1RatePercent },
-        { key: 'level1_installments', value: l1Installments },
-        { key: 'level1_interval_days', value: l1IntervalDays }
-      ]);
-      setMsg(`¡Condiciones guardadas! Nivel 1 fijado en $${l1MaxAmount} USD al ${l1RatePercent}% en ${l1Installments} cuota(s) cada ${l1IntervalDays} días.`);
+      await supabase.from('profiles').update(fields).eq('id', id);
+      setMsg('Usuario actualizado.');
+      loadData();
     } catch (err: any) {
-      setMsg('Error guardando condiciones: ' + err.message);
+      setMsg('Error actualizando usuario: ' + err.message);
     }
   };
 
-  const handleUpdateRate = async () => {
-    const val = parseFloat(rateInput);
-    if (!val || isNaN(val)) return;
+  // ---------------------------------------------------------------------
+  // PRÉSTAMOS Y PAGOS
+  // ---------------------------------------------------------------------
+  const confirmPayment = async (id: string, userId: string, amountUsd: number, ref: string, paidOnTime: boolean) => {
     try {
-      await supabase
-        .from('app_settings')
-        .upsert([{ key: 'bcv_rate', value: val.toString() }]);
-      setBcvRate(val);
-      setMsg(`Tasa BCV actualizada a Bs. ${val.toFixed(2)}.`);
-    } catch {
-      setBcvRate(val);
-      setMsg(`Tasa actualizada a Bs. ${val.toFixed(2)}.`);
-    }
-  };
+      await supabase.from('payments').update({ status: 'aprobado' }).eq('id', id);
 
-  // REGLA: Si pagó a tiempo, suma 1 pago consecutivo. Al 2do consecutivo sube de nivel.
-  // Si no pagó a tiempo, se reinicia a 0 y le toca pagar otra vez ese nivel.
-  const confirmPayment = async (id: string, userId?: string, amountUsd?: number, ref?: string, paidOnTime: boolean = true) => {
-    try {
-      await supabase
-        .from('payments')
-        .update({ status: 'aprobado' })
-        .eq('id', id);
+      const { data: userProf } = await supabase
+        .from('profiles')
+        .select('current_level, consecutive_paid_in_level, full_name')
+        .eq('id', userId)
+        .single();
 
-      if (userId) {
-        const { data: userProf } = await supabase
-          .from('profiles')
-          .select('current_level, consecutive_paid_in_level, full_name, phone')
-          .eq('id', userId)
-          .single();
+      const { data: levelRow } = await supabase
+        .from('loan_levels')
+        .select('payments_to_advance')
+        .eq('level', userProf?.current_level || 1)
+        .maybeSingle();
 
-        const currentLvl = userProf?.current_level || 1;
-        const currentConsecutive = userProf?.consecutive_paid_in_level || 0;
+      const currentLvl = userProf?.current_level || 1;
+      const needed = levelRow?.payments_to_advance || 2;
+      const currentConsecutive = userProf?.consecutive_paid_in_level || 0;
 
-        let nextLvl = currentLvl;
-        let nextConsecutive = paidOnTime ? currentConsecutive + 1 : 0;
-        let messageText = '';
+      let nextLvl = currentLvl;
+      let nextConsecutive = paidOnTime ? currentConsecutive + 1 : 0;
+      let messageText = '';
 
-        if (paidOnTime && nextConsecutive >= 2) {
-          nextLvl = currentLvl + 1;
-          nextConsecutive = 0;
-          messageText = `¡Has completado 2 pagos a tiempo! Has ascendido al Nivel ${nextLvl}.`;
-        } else if (!paidOnTime) {
-          messageText = `Pago recibido fuera de plazo. Tu progreso se reinicia y te tocará pagar nuevamente 2 veces en el Nivel ${currentLvl}.`;
-        } else {
-          messageText = `Pago 1 de 2 registrado a tiempo. Completa 1 pago más a tiempo para subir al Nivel ${currentLvl + 1}.`;
-        }
-
-        await supabase
-          .from('profiles')
-          .update({
-            current_level: nextLvl,
-            consecutive_paid_in_level: nextConsecutive
-          })
-          .eq('id', userId);
-
-        await supabase.from('notifications').insert([
-          {
-            user_id: userId,
-            title: paidOnTime ? '🎉 ¡Pago Aprobado a Tiempo!' : '⚠️ Pago Aprobado Fuera de Tiempo',
-            body: messageText,
-            type: 'pago_aprobado'
-          }
-        ]);
-
-        if (botToken && chatIdOps) {
-          const text = `✅ <b>PAGO APROBADO</b> (${paidOnTime ? 'A TIEMPO' : 'TARDE'})\n\n` +
-            `👤 <b>Cliente:</b> ${userProf?.full_name || userId}\n` +
-            `🔢 <b>Referencia:</b> #${ref}\n` +
-            `💵 <b>Monto:</b> $${amountUsd || 0} USD\n` +
-            `📊 <b>Nivel:</b> Nivel ${nextLvl} (Pagos a tiempo: ${nextConsecutive}/2)\n` +
-            `🔔 <i>Notificación enviada al usuario.</i>`;
-          await sendTelegramMessage(botToken, chatIdOps, text);
-        }
+      if (paidOnTime && nextConsecutive >= needed) {
+        nextLvl = Math.min(currentLvl + 1, 6);
+        nextConsecutive = 0;
+        messageText = nextLvl > currentLvl
+          ? `¡Has completado ${needed} pagos a tiempo! Has ascendido al Nivel ${nextLvl}.`
+          : `¡Excelente historial! Ya estás en el Nivel máximo (6).`;
+      } else if (!paidOnTime) {
+        messageText = `Pago recibido fuera de plazo. Tu progreso se reinicia y te tocará pagar nuevamente ${needed} veces en el Nivel ${currentLvl}.`;
+      } else {
+        messageText = `Pago ${nextConsecutive} de ${needed} registrado a tiempo. Completa ${needed - nextConsecutive} más para subir al Nivel ${Math.min(currentLvl + 1, 6)}.`;
       }
 
-      setMsg(`Pago #${id} conciliado (${paidOnTime ? 'A tiempo: suma pago' : 'Tarde: reinicia progreso'}).`);
+      await supabase.from('loans').update({ status: 'pagado' }).eq('id', payments.find((p) => p.id === id)?.loan_id);
+      await supabase.from('profiles').update({ current_level: nextLvl, consecutive_paid_in_level: nextConsecutive }).eq('id', userId);
+      await supabase.from('notifications').insert([{ user_id: userId, title: paidOnTime ? '🎉 ¡Pago Aprobado a Tiempo!' : '⚠️ Pago Aprobado Fuera de Tiempo', body: messageText, type: 'pago_aprobado' }]);
+
+      await notify({
+        channel: 'ops',
+        text: `✅ <b>PAGO APROBADO</b> (${paidOnTime ? 'A TIEMPO' : 'TARDE'})\n\n👤 <b>Cliente:</b> ${userProf?.full_name || userId}\n🔢 <b>Referencia:</b> #${ref}\n💵 <b>Monto:</b> $${amountUsd || 0} USD\n📊 <b>Nivel:</b> ${nextLvl}`
+      });
+
+      setMsg(`Pago #${ref} conciliado.`);
       loadData();
     } catch (err: any) {
       setMsg('Error aprobando pago: ' + err.message);
     }
   };
 
-  const approveLoan = async (id: string, userId?: string, amountUsd?: number) => {
+  const approveLoan = async (id: string, userId: string, amountUsd: number) => {
     try {
-      await supabase
-        .from('loans')
-        .update({ status: 'aprobado' })
-        .eq('id', id);
-
-      if (userId) {
-        await supabase.from('notifications').insert([
-          {
-            user_id: userId,
-            title: '💸 ¡Desembolso Aprobado!',
-            body: `Tu solicitud de préstamo por $${amountUsd || 0} USD fue aprobada y transferida a tu Pago Móvil.`,
-            type: 'desembolso'
-          }
-        ]);
-
-        if (botToken && chatIdOps) {
-          const text = `💰 <b>DESEMBOLSO DE PRÉSTAMO APROBADO</b>\n\n` +
-            `👤 <b>Usuario ID:</b> ${userId}\n` +
-            `💵 <b>Monto:</b> $${amountUsd || 0} USD\n` +
-            `📲 <b>Estado:</b> Transferido a Pago Móvil`;
-          await sendTelegramMessage(botToken, chatIdOps, text);
-        }
-      }
-
+      await supabase.from('loans').update({ status: 'aprobado' }).eq('id', id);
+      await supabase.from('notifications').insert([{ user_id: userId, title: '💸 ¡Desembolso Aprobado!', body: `Tu solicitud de préstamo por $${amountUsd || 0} USD fue aprobada.`, type: 'desembolso' }]);
+      await notify({ channel: 'ops', text: `💰 <b>DESEMBOLSO APROBADO</b>\n\n👤 Usuario: ${userId}\n💵 Monto: $${amountUsd || 0} USD` });
       setMsg(`Préstamo #${id} aprobado.`);
       loadData();
     } catch (err: any) {
@@ -262,31 +209,53 @@ export const Admin: React.FC = () => {
     }
   };
 
-  // AGREGAR A LISTA NEGRA
+  const rejectLoan = async (id: string) => {
+    try {
+      await supabase.from('loans').update({ status: 'rechazado' }).eq('id', id);
+      setMsg('Préstamo rechazado.');
+      loadData();
+    } catch (err: any) {
+      setMsg('Error: ' + err.message);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // KYC
+  // ---------------------------------------------------------------------
+  const handleVerifyKyc = async (clientId: string, clientName: string) => {
+    try {
+      await supabase.from('profiles').update({ kyc_status: 'verificado' }).eq('id', clientId);
+      await supabase.from('notifications').insert([{ user_id: clientId, title: '✅ Identidad Verificada', body: 'Tu cédula y selfie fueron verificadas. Ya puedes solicitar tu microcrédito.', type: 'kyc' }]);
+      setMsg(`KYC de ${clientName} verificado.`);
+      loadData();
+    } catch (err: any) {
+      setMsg('Error verificando KYC: ' + err.message);
+    }
+  };
+
+  const handleRejectKyc = async (clientId: string, clientName: string) => {
+    try {
+      await supabase.from('profiles').update({ kyc_status: 'rechazado' }).eq('id', clientId);
+      await supabase.from('notifications').insert([{ user_id: clientId, title: '❌ Verificación Rechazada', body: 'No pudimos validar tu cédula o selfie. Contacta a soporte.', type: 'kyc' }]);
+      setMsg(`KYC de ${clientName} rechazado.`);
+      loadData();
+    } catch (err: any) {
+      setMsg('Error rechazando KYC: ' + err.message);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA NEGRA
+  // ---------------------------------------------------------------------
   const handleAddToBlacklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!blockIdCard.trim()) return;
-
     try {
       const cleanCard = blockIdCard.trim().toUpperCase();
       const cleanEmail = blockEmail.trim().toLowerCase();
-
-      await supabase.from('black_list').insert([
-        {
-          id_card: cleanCard,
-          email: cleanEmail || null,
-          phone: blockPhone.trim() || null,
-          reason: blockReason.trim()
-        }
-      ]);
-
-      // Si existe perfil con esa cédula, marcarlo
-      await supabase
-        .from('profiles')
-        .update({ is_blacklisted: true, kyc_status: 'rechazado' })
-        .eq('id_card', cleanCard);
-
-      setMsg(`Cédula ${cleanCard} agregada a la Lista Negra Oficial.`);
+      await supabase.from('black_list').insert([{ id_card: cleanCard, email: cleanEmail || null, phone: blockPhone.trim() || null, reason: blockReason.trim() }]);
+      await supabase.from('profiles').update({ is_blacklisted: true, kyc_status: 'rechazado' }).eq('id_card', cleanCard);
+      setMsg(`Cédula ${cleanCard} agregada a la Lista Negra.`);
       setBlockIdCard('');
       setBlockEmail('');
       setBlockPhone('');
@@ -307,78 +276,108 @@ export const Admin: React.FC = () => {
     }
   };
 
-  // VERIFICACIÓN DE KYC (aprueba/rechaza la cédula y selfie subidas por el cliente)
-  const handleVerifyKyc = async (clientId: string, clientName: string) => {
+  // ---------------------------------------------------------------------
+  // CONFIGURACIÓN
+  // ---------------------------------------------------------------------
+  const handleUpdateRate = async () => {
+    const val = parseFloat(rateInput);
+    if (!val || isNaN(val)) return;
+    await supabase.from('app_settings').upsert([{ key: 'bcv_rate', value: val.toString() }]);
+    setMsg(`Tasa BCV actualizada a Bs. ${val.toFixed(2)}.`);
+  };
+
+  const handleSavePayout = async () => {
+    await supabase.from('app_settings').upsert(Object.entries(payout).map(([key, value]) => ({ key, value })));
+    setMsg('Datos de Pago Móvil actualizados.');
+  };
+
+  const handleSaveSecrets = async () => {
+    await supabase.from('app_secrets').upsert(Object.entries(secrets).map(([key, value]) => ({ key, value })));
+    setMsg('Bots de Telegram guardados.');
+  };
+
+  const handleLevelChange = (level: number, field: string, value: string) => {
+    setLevels((prev) => prev.map((lv) => (lv.level === level ? { ...lv, [field]: value } : lv)));
+  };
+
+  const handleSaveLevels = async () => {
     try {
-      await supabase.from('profiles').update({ kyc_status: 'verificado' }).eq('id', clientId);
-      await supabase.from('notifications').insert([
-        {
-          user_id: clientId,
-          title: '✅ Identidad Verificada',
-          body: 'Tu cédula y selfie fueron verificadas. Ya puedes solicitar tu primer microcrédito.',
-          type: 'kyc'
-        }
-      ]);
-      setMsg(`KYC de ${clientName} verificado. Ya puede solicitar préstamo.`);
-      loadData();
+      await supabase.from('loan_levels').upsert(
+        levels.map((lv) => ({
+          level: lv.level,
+          max_amount_usd: parseFloat(lv.max_amount_usd),
+          rate_percent: parseFloat(lv.rate_percent),
+          installments: parseInt(lv.installments, 10),
+          interval_days: parseInt(lv.interval_days, 10),
+          payments_to_advance: parseInt(lv.payments_to_advance, 10)
+        }))
+      );
+      setMsg('Niveles 1-6 guardados.');
     } catch (err: any) {
-      setMsg('Error verificando KYC: ' + err.message);
+      setMsg('Error guardando niveles: ' + err.message);
     }
   };
 
-  const handleRejectKyc = async (clientId: string, clientName: string) => {
+  // ---------------------------------------------------------------------
+  // SOPORTE
+  // ---------------------------------------------------------------------
+  const threadUserIds = Array.from(new Set(supportMessages.map((m) => m.user_id)));
+  const clientById = (id: string) => clients.find((c) => c.id === id);
+  const threadFor = (userId: string) => supportMessages.filter((m) => m.user_id === userId);
+
+  const handleAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSupportUser || !replyText.trim()) return;
     try {
-      await supabase.from('profiles').update({ kyc_status: 'rechazado' }).eq('id', clientId);
-      await supabase.from('notifications').insert([
-        {
-          user_id: clientId,
-          title: '❌ Verificación Rechazada',
-          body: 'No pudimos validar tu cédula o selfie. Por favor contacta a soporte o vuelve a registrarte con fotos más claras.',
-          type: 'kyc'
-        }
-      ]);
-      setMsg(`KYC de ${clientName} rechazado.`);
+      await supabase.from('support_messages').insert([{ user_id: selectedSupportUser, sender: 'admin', body: replyText.trim() }]);
+      const client = clientById(selectedSupportUser);
+      await notify({ channel: 'support', text: `↩️ Respuesta enviada desde el panel a ${client?.full_name || selectedSupportUser}:\n${replyText.trim()}` });
+      setReplyText('');
       loadData();
-    } catch (err: any) {
-      setMsg('Error rechazando KYC: ' + err.message);
+    } catch (err) {
+      console.error(err);
     }
   };
+
+  if (!profile) return null;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-fade-in">
+      {/* Header propio del admin, independiente del Navbar del cliente */}
+      <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl">
         <div className="flex items-center space-x-3.5">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-black uppercase text-amber-400 tracking-wider">Panel Administrador</span>
-              <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">Supabase Real</span>
-            </div>
-            <h1 className="text-2xl font-black text-white">Consola de Control, Reglas & Lista Negra</h1>
-            <p className="text-xs text-slate-400">Sesión: {profile?.email || 'Administrador'}</p>
+            <span className="text-xs font-black uppercase text-amber-400 tracking-wider">Panel Administrador</span>
+            <h1 className="text-xl font-black text-white">Consola de Control PrestApp</h1>
+            <p className="text-xs text-slate-400">Sesión: {profile.email}</p>
           </div>
         </div>
+        <button
+          onClick={logout}
+          className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Cerrar Sesión</span>
+        </button>
+      </div>
 
-        {/* BCV Adjuster */}
-        <div className="flex items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400 pl-2">Tasa BCV:</span>
-          <input
-            type="number"
-            step="0.01"
-            value={rateInput}
-            onChange={(e) => setRateInput(e.target.value)}
-            className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none"
-          />
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {TABS.map((t) => (
           <button
-            onClick={handleUpdateRate}
-            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs"
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition border ${
+              tab === t.id ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+            }`}
           >
-            Fijar
+            {t.icon}
+            <span>{t.label}</span>
           </button>
-        </div>
+        ))}
       </div>
 
       {msg && (
@@ -388,384 +387,294 @@ export const Admin: React.FC = () => {
         </div>
       )}
 
-      {/* 1. MÓDULO LISTA NEGRA PERMANENTE */}
-      <div className="bg-slate-900 border-2 border-rose-500/40 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div className="flex items-center space-x-2.5">
-            <Ban className="w-5 h-5 text-rose-400" />
-            <div>
-              <h3 className="text-lg font-bold text-white">Lista Negra Oficial (Bloqueo por Impago)</h3>
-              <p className="text-xs text-slate-400">Las cédulas o correos en esta lista no pueden registrarse ni pedir préstamos</p>
+      {loading ? (
+        <p className="text-xs text-slate-400 text-center py-10">Cargando datos...</p>
+      ) : (
+        <>
+          {/* ============ USUARIOS ============ */}
+          {tab === 'usuarios' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+              <h2 className="text-lg font-bold text-white pb-2 border-b border-slate-800">Usuarios ({clients.length})</h2>
+              {clients.map((c) => (
+                <ClientEditRow key={c.id} client={c} onSave={(fields) => saveClient(c.id, fields)} />
+              ))}
             </div>
-          </div>
-          <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20">
-            {blacklist.length} Bloqueados
-          </span>
-        </div>
+          )}
 
-        <form onSubmit={handleAddToBlacklist} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Cédula a Bloquear</label>
-            <input
-              type="text"
-              required
-              placeholder="V-12345678"
-              value={blockIdCard}
-              onChange={(e) => setBlockIdCard(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Correo Electrónico</label>
-            <input
-              type="email"
-              placeholder="moroso@correo.com"
-              value={blockEmail}
-              onChange={(e) => setBlockEmail(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Teléfono</label>
-            <input
-              type="text"
-              placeholder="0414-0000000"
-              value={blockPhone}
-              onChange={(e) => setBlockPhone(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition"
-            >
-              Bloquear Permanentemente
-            </button>
-          </div>
-        </form>
-
-        {blacklist.length > 0 && (
-          <div className="space-y-2 pt-2">
-            {blacklist.map((item) => (
-              <div key={item.id} className="bg-slate-950 p-3 rounded-xl border border-rose-900/40 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-bold text-rose-400">{item.id_card}</span>
-                  {item.email && <span className="text-slate-400 ml-2">({item.email})</span>}
-                  <span className="text-slate-500 ml-2 text-[11px]">• Motivo: {item.reason}</span>
-                </div>
-                <button
-                  onClick={() => handleRemoveFromBlacklist(item.id, item.id_card)}
-                  className="p-1 text-slate-500 hover:text-white transition"
-                  title="Desbloquear"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 2. CONFIGURACIÓN DEL PRIMER NIVEL ($1 USD, 2 PAGOS PARA SUBIR) */}
-      <div className="bg-slate-900 border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div className="flex items-center space-x-2.5">
-            <Sliders className="w-5 h-5 text-emerald-400" />
-            <div>
-              <h3 className="text-lg font-bold text-white">Parámetros del Primer Nivel ($1 USD)</h3>
-              <p className="text-xs text-slate-400">Regla activa: El cliente debe pagar 2 veces a tiempo para avanzar al Nivel 2</p>
-            </div>
-          </div>
-          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-            Nivel 1 Activo
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 block uppercase">1. Monto ($ USD)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">$</span>
-              <input
-                type="number"
-                value={l1MaxAmount}
-                onChange={(e) => setL1MaxAmount(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <p className="text-[10px] text-slate-500">Monto del primer nivel ($1 USD)</p>
-          </div>
-
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 block uppercase">2. Porcentaje Interés (%)</label>
-            <div className="relative">
-              <span className="absolute right-3 top-2.5 text-xs text-slate-500 font-bold">%</span>
-              <input
-                type="number"
-                step="0.5"
-                value={l1RatePercent}
-                onChange={(e) => setL1RatePercent(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <p className="text-[10px] text-slate-500">Interés aplicado al crédito</p>
-          </div>
-
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 block uppercase">3. Número de Cuotas</label>
-            <input
-              type="number"
-              min="1"
-              max="12"
-              value={l1Installments}
-              onChange={(e) => setL1Installments(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
-            />
-            <p className="text-[10px] text-slate-500">Cuotas de devolución</p>
-          </div>
-
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 block uppercase">4. Cada Cuánto (Días)</label>
-            <input
-              type="number"
-              min="1"
-              max="90"
-              value={l1IntervalDays}
-              onChange={(e) => setL1IntervalDays(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
-            />
-            <p className="text-[10px] text-slate-500">Frecuencia por cuota</p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleSaveLoanRules}
-          className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-sm transition shadow-lg shadow-emerald-500/20"
-        >
-          Guardar Parámetros de Préstamo
-        </button>
-      </div>
-
-      {/* 2b. CLIENTES Y VERIFICACIÓN DE KYC */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-800">
-          <ShieldQuestion className="w-5 h-5 text-blue-400" />
-          <span>Clientes y Verificación de KYC</span>
-          <span className="text-xs font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
-            {clients.filter((c) => c.kyc_status === 'en_revision').length} en revisión
-          </span>
-        </h2>
-
-        {clients.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">Todavía no hay clientes registrados.</p>
-        ) : (
-          <div className="space-y-3">
-            {clients.map((c) => (
-              <div key={c.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    {c.cedula_url ? (
-                      <a href={c.cedula_url} target="_blank" rel="noreferrer">
-                        <img src={c.cedula_url} alt="Cédula" className="w-12 h-12 object-cover rounded-lg border border-slate-700" />
-                      </a>
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>
-                    )}
-                    {c.selfie_url ? (
-                      <a href={c.selfie_url} target="_blank" rel="noreferrer">
-                        <img src={c.selfie_url} alt="Selfie" className="w-12 h-12 object-cover rounded-lg border border-slate-700" />
-                      </a>
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>
+          {/* ============ PRÉSTAMOS Y PAGOS ============ */}
+          {tab === 'prestamos' && (
+            <div className="space-y-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+                <h2 className="text-lg font-bold text-white pb-2 border-b border-slate-800">Solicitudes de Préstamo ({loans.length})</h2>
+                {loans.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">Sin solicitudes.</p>}
+                {loans.map((l) => (
+                  <div key={l.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-white">${l.amount_usd} USD — Nivel {l.level_borrowed} <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{l.status}</span></p>
+                      <p className="text-[11px] text-slate-500">Usuario: {clientById(l.user_id)?.full_name || l.user_id}</p>
+                    </div>
+                    {l.status === 'pendiente' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => approveLoan(l.id, l.user_id, l.amount_usd)} className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs">Aprobar</button>
+                        <button onClick={() => rejectLoan(l.id)} className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs">Rechazar</button>
+                      </div>
                     )}
                   </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+                <h2 className="text-lg font-bold text-white pb-2 border-b border-slate-800">Pagos Reportados ({payments.length})</h2>
+                {payments.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">Sin pagos reportados.</p>}
+                {payments.map((p) => (
+                  <div key={p.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-white">Ref #{p.reference} — ${p.amount_usd} USD <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{p.status}</span></p>
+                      <p className="text-[11px] text-slate-500">Usuario: {clientById(p.user_id)?.full_name || p.user_id}</p>
+                    </div>
+                    {p.status !== 'aprobado' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => confirmPayment(p.id, p.user_id, p.amount_usd, p.reference, true)} className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs">Pagó a Tiempo</button>
+                        <button onClick={() => confirmPayment(p.id, p.user_id, p.amount_usd, p.reference, false)} className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs">Pagó Tarde</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============ KYC ============ */}
+          {tab === 'kyc' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+              <h2 className="text-lg font-bold text-white pb-2 border-b border-slate-800">
+                Verificación de KYC — {clients.filter((c) => c.kyc_status === 'en_revision').length} pendientes
+              </h2>
+              {clients.map((c) => (
+                <div key={c.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1.5">
+                      {c.cedula_url ? <a href={c.cedula_url} target="_blank" rel="noreferrer"><img src={c.cedula_url} className="w-12 h-12 object-cover rounded-lg border border-slate-700" /></a> : <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>}
+                      {c.selfie_url ? <a href={c.selfie_url} target="_blank" rel="noreferrer"><img src={c.selfie_url} className="w-12 h-12 object-cover rounded-lg border border-slate-700" /></a> : <div className="w-12 h-12 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center text-[9px] text-slate-600">Sin foto</div>}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{c.full_name}</p>
+                      <p className="text-[11px] text-slate-500">{c.id_card} • {c.email}</p>
+                      <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${KYC_BADGE[c.kyc_status] || KYC_BADGE.no_verificado}`}>{c.kyc_status}</span>
+                    </div>
+                  </div>
+                  {c.kyc_status !== 'verificado' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleVerifyKyc(c.id, c.full_name)} className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /><span>Verificar</span></button>
+                      <button onClick={() => handleRejectKyc(c.id, c.full_name)} className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /><span>Rechazar</span></button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ============ LISTA NEGRA ============ */}
+          {tab === 'blacklist' && (
+            <div className="bg-slate-900 border-2 border-rose-500/40 rounded-3xl p-6 space-y-4 shadow-xl">
+              <h2 className="text-lg font-bold text-white pb-2 border-b border-slate-800">Lista Negra Oficial ({blacklist.length})</h2>
+              <form onSubmit={handleAddToBlacklist} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                <input type="text" required placeholder="Cédula V-12345678" value={blockIdCard} onChange={(e) => setBlockIdCard(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
+                <input type="email" placeholder="Correo" value={blockEmail} onChange={(e) => setBlockEmail(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
+                <input type="text" placeholder="Teléfono" value={blockPhone} onChange={(e) => setBlockPhone(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
+                <button type="submit" className="py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs">Bloquear</button>
+              </form>
+              {blacklist.map((item) => (
+                <div key={item.id} className="bg-slate-950 p-3 rounded-xl border border-rose-900/40 flex items-center justify-between text-xs">
                   <div>
-                    <p className="text-sm font-bold text-white">{c.full_name}</p>
-                    <p className="text-[11px] text-slate-500">{c.id_card} • {c.email} • Nivel {c.current_level}</p>
-                    <span
-                      className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        c.kyc_status === 'verificado'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : c.kyc_status === 'rechazado'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : 'bg-amber-500/20 text-amber-400'
-                      }`}
-                    >
-                      {c.kyc_status}
-                    </span>
+                    <span className="font-bold text-rose-400">{item.id_card}</span>
+                    {item.email && <span className="text-slate-400 ml-2">({item.email})</span>}
+                    <span className="text-slate-500 ml-2 text-[11px]">• {item.reason}</span>
+                  </div>
+                  <button onClick={() => handleRemoveFromBlacklist(item.id, item.id_card)} className="p-1 text-slate-500 hover:text-white"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ============ SOPORTE ============ */}
+          {tab === 'soporte' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-2 shadow-xl sm:col-span-1">
+                <h2 className="text-sm font-bold text-white pb-2 border-b border-slate-800">Conversaciones</h2>
+                {threadUserIds.length === 0 && <p className="text-xs text-slate-500 py-4 text-center">Sin mensajes de soporte.</p>}
+                {threadUserIds.map((uid) => {
+                  const c = clientById(uid);
+                  const thread = threadFor(uid);
+                  const last = thread[thread.length - 1];
+                  return (
+                    <button key={uid} onClick={() => setSelectedSupportUser(uid)} className={`w-full text-left p-3 rounded-xl border text-xs ${selectedSupportUser === uid ? 'bg-blue-500/10 border-blue-500/40' : 'bg-slate-950 border-slate-800'}`}>
+                      <p className="font-bold text-white">{c?.full_name || uid}</p>
+                      <p className="text-slate-500 truncate">{last?.body}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl sm:col-span-2 flex flex-col gap-3">
+                {!selectedSupportUser ? (
+                  <p className="text-xs text-slate-500 text-center py-10">Selecciona una conversación. Recuerda que también puedes responder directo desde Telegram.</p>
+                ) : (
+                  <>
+                    <div className="h-80 overflow-y-auto flex flex-col gap-2 bg-slate-950 rounded-2xl border border-slate-800 p-3">
+                      {threadFor(selectedSupportUser).map((m) => (
+                        <div key={m.id} className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs ${m.sender === 'admin' ? 'self-end bg-amber-500 text-slate-950' : 'self-start bg-slate-800 text-slate-100'}`}>
+                          {m.body}
+                        </div>
+                      ))}
+                    </div>
+                    <form onSubmit={handleAdminReply} className="flex gap-2">
+                      <input type="text" placeholder="Responder desde el panel..." value={replyText} onChange={(e) => setReplyText(e.target.value)} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                      <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl"><Send className="w-4 h-4" /></button>
+                    </form>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ============ CONFIGURACIÓN ============ */}
+          {tab === 'config' && (
+            <div className="space-y-6">
+              {/* Tasa BCV */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+                <h3 className="text-base font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-emerald-400" /> Tasa BCV</h3>
+                <div className="flex gap-2">
+                  <input type="number" step="0.01" value={rateInput} onChange={(e) => setRateInput(e.target.value)} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white" />
+                  <button onClick={handleUpdateRate} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs">Guardar</button>
+                </div>
+              </div>
+
+              {/* Niveles 1-6 */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl overflow-x-auto">
+                <h3 className="text-base font-bold text-white flex items-center gap-2"><Sliders className="w-4 h-4 text-blue-400" /> Niveles de Préstamo (1 al 6)</h3>
+                <table className="w-full text-xs min-w-[560px]">
+                  <thead>
+                    <tr className="text-slate-500 text-left">
+                      <th className="pb-2">Nivel</th>
+                      <th className="pb-2">Monto USD</th>
+                      <th className="pb-2">Interés %</th>
+                      <th className="pb-2">Cuotas</th>
+                      <th className="pb-2">Días</th>
+                      <th className="pb-2">Pagos p/subir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {levels.map((lv) => (
+                      <tr key={lv.level} className="border-t border-slate-800">
+                        <td className="py-2 font-black text-white">{lv.level}</td>
+                        <td><input type="number" value={lv.max_amount_usd} onChange={(e) => handleLevelChange(lv.level, 'max_amount_usd', e.target.value)} className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white" /></td>
+                        <td><input type="number" step="0.5" value={lv.rate_percent} onChange={(e) => handleLevelChange(lv.level, 'rate_percent', e.target.value)} className="w-16 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white" /></td>
+                        <td><input type="number" value={lv.installments} onChange={(e) => handleLevelChange(lv.level, 'installments', e.target.value)} className="w-14 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white" /></td>
+                        <td><input type="number" value={lv.interval_days} onChange={(e) => handleLevelChange(lv.level, 'interval_days', e.target.value)} className="w-16 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white" /></td>
+                        <td><input type="number" value={lv.payments_to_advance} onChange={(e) => handleLevelChange(lv.level, 'payments_to_advance', e.target.value)} className="w-14 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button onClick={handleSaveLevels} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold">Guardar Niveles</button>
+              </div>
+
+              {/* Pago Móvil */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3 shadow-xl">
+                <h3 className="text-base font-bold text-white flex items-center gap-2"><Landmark className="w-4 h-4 text-emerald-400" /> Datos de Pago Móvil (a dónde te pagan)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input placeholder="Banco" value={payout.payout_bank_name} onChange={(e) => setPayout({ ...payout, payout_bank_name: e.target.value })} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                  <input placeholder="Teléfono" value={payout.payout_phone} onChange={(e) => setPayout({ ...payout, payout_phone: e.target.value })} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                  <input placeholder="Cédula/RIF" value={payout.payout_id_card} onChange={(e) => setPayout({ ...payout, payout_id_card: e.target.value })} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                  <input placeholder="Titular" value={payout.payout_holder_name} onChange={(e) => setPayout({ ...payout, payout_holder_name: e.target.value })} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                </div>
+                <button onClick={handleSavePayout} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs">Guardar</button>
+              </div>
+
+              {/* Bots de Telegram */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+                <h3 className="text-base font-bold text-white flex items-center gap-2"><Bot className="w-4 h-4 text-blue-400" /> Bots de Telegram (3 canales independientes)</h3>
+
+                <div className="space-y-2 bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-emerald-400">1. Bot de Operaciones (préstamos y pagos)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input placeholder="Bot Token" value={secrets.telegram_ops_bot_token} onChange={(e) => setSecrets({ ...secrets, telegram_ops_bot_token: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                    <input placeholder="Chat ID" value={secrets.telegram_ops_chat_id} onChange={(e) => setSecrets({ ...secrets, telegram_ops_chat_id: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
                   </div>
                 </div>
 
-                {c.kyc_status !== 'verificado' && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleVerifyKyc(c.id, c.full_name)}
-                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Verificar</span>
-                    </button>
-                    <button
-                      onClick={() => handleRejectKyc(c.id, c.full_name)}
-                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-1"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Rechazar</span>
-                    </button>
+                <div className="space-y-2 bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-amber-400">2. Bot de Registro / KYC</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input placeholder="Bot Token" value={secrets.telegram_kyc_bot_token} onChange={(e) => setSecrets({ ...secrets, telegram_kyc_bot_token: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                    <input placeholder="Chat ID" value={secrets.telegram_kyc_chat_id} onChange={(e) => setSecrets({ ...secrets, telegram_kyc_chat_id: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 3. PAGOS MÓVILES REPORTADOS (VALIDACIÓN A TIEMPO VS TARDE) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-800">
-          <span>Pagos Móviles Reportados</span>
-          <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">
-            {pendingPayments.length} registros
-          </span>
-        </h2>
-
-        {pendingPayments.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">No hay pagos reportados en la tabla de Supabase.</p>
-        ) : (
-          <div className="space-y-3">
-            {pendingPayments.map((p) => (
-              <div key={p.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">Ref: #{p.reference}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                      {p.status || 'pendiente'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-1">
-                    Monto: <strong className="text-emerald-400">Bs. {Number(p.amount_ves || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</strong> (${p.amount_usd || 0} USD)
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Usuario: {p.user_id} • Fecha: {new Date(p.created_at || Date.now()).toLocaleString()}
-                  </p>
                 </div>
 
-                {p.status !== 'aprobado' && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => confirmPayment(p.id, p.user_id, p.amount_usd, p.reference, true)}
-                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center space-x-1"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Pagó a Tiempo (+1)</span>
-                    </button>
-                    <button
-                      onClick={() => confirmPayment(p.id, p.user_id, p.amount_usd, p.reference, false)}
-                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs"
-                    >
-                      Pagó Tarde (Reinicia)
-                    </button>
+                <div className="space-y-2 bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-blue-400">3. Bot de Soporte (bidireccional con la app)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input placeholder="Bot Token" value={secrets.telegram_support_bot_token} onChange={(e) => setSecrets({ ...secrets, telegram_support_bot_token: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+                    <input placeholder="Chat ID" value={secrets.telegram_support_chat_id} onChange={(e) => setSecrets({ ...secrets, telegram_support_chat_id: e.target.value })} className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 4. SOLICITUDES DE PRÉSTAMO */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-800">
-          <span>Solicitudes de Préstamo Recibidas</span>
-          <span className="text-xs font-black bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
-            {pendingLoans.length} solicitudes
-          </span>
-        </h2>
-
-        {pendingLoans.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">No hay solicitudes de crédito pendientes en Supabase.</p>
-        ) : (
-          <div className="space-y-3">
-            {pendingLoans.map((l) => (
-              <div key={l.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">${l.amount_usd || 0} USD</span>
-                    <span className="text-xs text-emerald-400 font-semibold">
-                      (Bs. {Number(l.amount_ves || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })})
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${l.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                      {l.status || 'pendiente'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    ID Usuario: {l.user_id}
-                  </p>
+                  <p className="text-[10px] text-slate-500">Para que tus respuestas en Telegram lleguen a la app, este bot necesita su Webhook configurado (ver LEEME_ACTUALIZACION.md).</p>
                 </div>
 
-                {l.status !== 'aprobado' && (
-                  <button
-                    onClick={() => approveLoan(l.id, l.user_id, l.amount_usd)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 shadow-lg shadow-blue-600/20"
-                  >
-                    <span>Aprobar Desembolso</span>
-                  </button>
-                )}
+                <button onClick={handleSaveSecrets} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold">Guardar Bots</button>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Fila editable de usuario (nivel, KYC, rol, bloqueo, datos de contacto)
+// ---------------------------------------------------------------------------
+const ClientEditRow: React.FC<{ client: any; onSave: (fields: any) => void }> = ({ client, onSave }) => {
+  const [full_name, setFullName] = useState(client.full_name);
+  const [phone, setPhone] = useState(client.phone);
+  const [bank_name, setBankName] = useState(client.bank_name || '');
+  const [current_level, setCurrentLevel] = useState(client.current_level || 1);
+  const [kyc_status, setKycStatus] = useState(client.kyc_status);
+  const [role, setRole] = useState(client.role);
+  const [is_blacklisted, setBlacklisted] = useState(!!client.is_blacklisted);
+
+  return (
+    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-white">{client.full_name} <span className="text-slate-500 font-normal text-xs">({client.id_card})</span></p>
+        {is_blacklisted && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400">Bloqueado</span>}
       </div>
-
-      {/* 5. CANALES TELEGRAM */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div className="flex items-center space-x-2">
-            <Settings className="w-5 h-5 text-blue-400" />
-            <h3 className="text-base font-bold text-white">Canales de Telegram</h3>
-          </div>
-          <span className="text-[11px] text-slate-400">KYC y Notificaciones Operativas</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Bot Token de Telegram</label>
-            <input
-              type="text"
-              placeholder="7123456789:AAH..."
-              value={botToken}
-              onChange={(e) => setBotToken(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Chat ID KYC (Fotos)</label>
-            <input
-              type="text"
-              placeholder="-100..."
-              value={chatIdKyc}
-              onChange={(e) => setChatIdKyc(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-slate-300 block mb-1">Chat ID Operaciones</label>
-            <input
-              type="text"
-              placeholder="-100..."
-              value={chatIdOps}
-              onChange={(e) => setChatIdOps(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-        </div>
-
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <input value={full_name} onChange={(e) => setFullName(e.target.value)} placeholder="Nombre" className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Teléfono" className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white" />
+        <input value={bank_name} onChange={(e) => setBankName(e.target.value)} placeholder="Banco" className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white" />
+        <select value={current_level} onChange={(e) => setCurrentLevel(Number(e.target.value))} className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white">
+          {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>Nivel {n}</option>)}
+        </select>
+        <select value={kyc_status} onChange={(e) => setKycStatus(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white">
+          <option value="no_verificado">no_verificado</option>
+          <option value="en_revision">en_revision</option>
+          <option value="verificado">verificado</option>
+          <option value="rechazado">rechazado</option>
+        </select>
+        <select value={role} onChange={(e) => setRole(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white">
+          <option value="cliente">cliente</option>
+          <option value="admin">admin</option>
+        </select>
+        <label className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-white">
+          <input type="checkbox" checked={is_blacklisted} onChange={(e) => setBlacklisted(e.target.checked)} />
+          <span>Bloqueado</span>
+        </label>
         <button
-          onClick={saveSettings}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition"
+          onClick={() => onSave({ full_name, phone, bank_name, current_level, kyc_status, role, is_blacklisted })}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg"
         >
-          Guardar Configuración de Telegram
+          Guardar
         </button>
       </div>
     </div>
