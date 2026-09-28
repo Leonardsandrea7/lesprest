@@ -1,17 +1,15 @@
 import React from 'react';
 import { 
-  Download, 
-  Smartphone, 
   ShieldCheck, 
   Zap, 
-  CheckCircle2, 
   Clock, 
-  ArrowDown, 
   CreditCard,
   Lock,
-  Sparkles
+  Sparkles,
+  Smartphone
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { GetAppButton } from '../components/GetAppButton';
 
 export const Dashboard: React.FC = () => {
   return (
@@ -39,20 +37,9 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* BOTÓN DESTACADO PARA DESCARGAR LA APK DIRECTA */}
-        <div className="pt-2 max-w-md mx-auto space-y-3">
-          <a
-            href="/prestapp.apk"
-            download="PrestApp-Oficial.apk"
-            className="w-full inline-flex items-center justify-center space-x-3 px-8 py-5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black rounded-2xl shadow-2xl shadow-emerald-500/40 transition duration-200 text-lg cursor-pointer transform hover:-translate-y-0.5"
-          >
-            <Download className="w-6 h-6 stroke-[3]" />
-            <span>Descargar App Oficial Android (APK)</span>
-          </a>
-          <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Archivo APK oficial y funcional (24 MB) • Para todos los teléfonos Android</span>
-          </p>
+        {/* BOTÓN ÚNICO PARA OBTENER LA APP */}
+        <div className="pt-2 max-w-md mx-auto">
+          <GetAppButton variant="hero" />
         </div>
       </div>
 
@@ -118,8 +105,8 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1.5">
             <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Paso 1</span>
-            <h4 className="text-sm font-bold text-white">Descarga e Instala</h4>
-            <p className="text-xs text-slate-400">Descarga la APK directamente con el botón verde e instálala en tu teléfono Android.</p>
+            <h4 className="text-sm font-bold text-white">Instala PrestApp</h4>
+            <p className="text-xs text-slate-400">Usa el botón de arriba para instalarla en tu teléfono Android.</p>
           </div>
 
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1.5">
@@ -133,18 +120,6 @@ export const Dashboard: React.FC = () => {
             <h4 className="text-sm font-bold text-white">Recibe tu Dinero</h4>
             <p className="text-xs text-slate-400">Confirma la solicitud y el desembolso cae de inmediato a tu Pago Móvil.</p>
           </div>
-        </div>
-
-        {/* Segundo botón de descarga al final de la página */}
-        <div className="pt-2 text-center">
-          <a
-            href="/prestapp.apk"
-            download="PrestApp-Oficial.apk"
-            className="inline-flex items-center justify-center space-x-2 px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/30 transition text-base"
-          >
-            <Download className="w-5 h-5 stroke-[2.5]" />
-            <span>Descargar PrestApp Android (.apk)</span>
-          </a>
         </div>
       </div>
 

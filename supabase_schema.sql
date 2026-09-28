@@ -170,7 +170,28 @@ CREATE TABLE IF NOT EXISTS public.support_messages (
 );
 
 -- ------------------------------------------------------------------------------
--- 10. ROW LEVEL SECURITY
+-- 10. FUNCIÓN AUXILIAR PARA EVITAR RECURSIÓN EN RLS
+-- Las políticas de abajo necesitan saber "¿este usuario es admin?" y para eso
+-- consultarían la propia tabla profiles — pero como profiles TAMBIÉN tiene RLS,
+-- eso puede generar "infinite recursion detected in policy for relation profiles"
+-- y tumbar CUALQUIER consulta a profiles (logins, registros, todo). Esta función
+-- es SECURITY DEFINER: corre saltándose el RLS solo para esta comprobación puntual,
+-- rompiendo el ciclo. Es el patrón oficial recomendado por Supabase para esto.
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 11. ROW LEVEL SECURITY
 -- ------------------------------------------------------------------------------
 ALTER TABLE public.black_list ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -185,46 +206,46 @@ ALTER TABLE public.support_messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Blacklist read" ON public.black_list;
 CREATE POLICY "Blacklist read" ON public.black_list FOR SELECT TO PUBLIC USING (true);
 DROP POLICY IF EXISTS "Blacklist admin" ON public.black_list;
-CREATE POLICY "Blacklist admin" ON public.black_list FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Blacklist admin" ON public.black_list FOR ALL USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Profiles read" ON public.profiles;
-CREATE POLICY "Profiles read" ON public.profiles FOR SELECT USING (auth.uid() = id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Profiles read" ON public.profiles FOR SELECT USING (auth.uid() = id OR public.is_admin());
 DROP POLICY IF EXISTS "Profiles insert" ON public.profiles;
 CREATE POLICY "Profiles insert" ON public.profiles FOR INSERT WITH CHECK (true);
 DROP POLICY IF EXISTS "Profiles update" ON public.profiles;
-CREATE POLICY "Profiles update" ON public.profiles FOR UPDATE USING (auth.uid() = id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Profiles update" ON public.profiles FOR UPDATE USING (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Loans access" ON public.loans;
-CREATE POLICY "Loans access" ON public.loans FOR ALL USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin') WITH CHECK (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Loans access" ON public.loans FOR ALL USING (auth.uid() = user_id OR public.is_admin()) WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Payments access" ON public.payments;
-CREATE POLICY "Payments access" ON public.payments FOR ALL USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin') WITH CHECK (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Payments access" ON public.payments FOR ALL USING (auth.uid() = user_id OR public.is_admin()) WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Notifications access" ON public.notifications;
-CREATE POLICY "Notifications access" ON public.notifications FOR ALL USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Notifications access" ON public.notifications FOR ALL USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Settings read" ON public.app_settings;
 CREATE POLICY "Settings read" ON public.app_settings FOR SELECT TO PUBLIC USING (true);
 DROP POLICY IF EXISTS "Settings admin" ON public.app_settings;
-CREATE POLICY "Settings admin" ON public.app_settings FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Settings admin" ON public.app_settings FOR ALL USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Secrets admin only" ON public.app_secrets;
-CREATE POLICY "Secrets admin only" ON public.app_secrets FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin') WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Secrets admin only" ON public.app_secrets FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Loan levels read" ON public.loan_levels;
 CREATE POLICY "Loan levels read" ON public.loan_levels FOR SELECT TO PUBLIC USING (true);
 DROP POLICY IF EXISTS "Loan levels admin write" ON public.loan_levels;
-CREATE POLICY "Loan levels admin write" ON public.loan_levels FOR ALL USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin') WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Loan levels admin write" ON public.loan_levels FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Support select" ON public.support_messages;
-CREATE POLICY "Support select" ON public.support_messages FOR SELECT USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Support select" ON public.support_messages FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 DROP POLICY IF EXISTS "Support insert" ON public.support_messages;
-CREATE POLICY "Support insert" ON public.support_messages FOR INSERT WITH CHECK (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Support insert" ON public.support_messages FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
 DROP POLICY IF EXISTS "Support update" ON public.support_messages;
-CREATE POLICY "Support update" ON public.support_messages FOR UPDATE USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+CREATE POLICY "Support update" ON public.support_messages FOR UPDATE USING (auth.uid() = user_id OR public.is_admin());
 
 -- ------------------------------------------------------------------------------
--- 11. STORAGE: bucket privado para fotos de KYC (cédula + selfie)
+-- 12. STORAGE: bucket privado para fotos de KYC (cédula + selfie)
 -- ------------------------------------------------------------------------------
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('kyc-photos', 'kyc-photos', false)
@@ -244,7 +265,7 @@ CREATE POLICY "kyc_update_own_folder" ON storage.objects FOR UPDATE
 
 DROP POLICY IF EXISTS "kyc_admin_read_all" ON storage.objects;
 CREATE POLICY "kyc_admin_read_all" ON storage.objects FOR SELECT
-  USING (bucket_id = 'kyc-photos' AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+  USING (bucket_id = 'kyc-photos' AND public.is_admin());
 
 -- ==============================================================================
 -- LISTO. Con esto solo, tu proyecto de Supabase queda 100% preparado.

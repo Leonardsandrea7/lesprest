@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
-import { InstallBanner } from './components/InstallBanner';
 import { Dashboard } from './pages/Dashboard';
 import { ClientPanel } from './pages/ClientPanel';
 import { Perfil } from './pages/Perfil';
@@ -70,7 +69,6 @@ const Shell: React.FC = () => {
           PrestApp Venezuela — Microcréditos progresivos en Bolívares y Dólares. Operaciones y solicitudes exclusivas desde la App Oficial Android.
         </footer>
       )}
-      {!isAdmin && <InstallBanner />}
     </div>
   );
 };

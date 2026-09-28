@@ -57,15 +57,21 @@ curl -X POST "https://api.telegram.org/bot<TOKEN_DEL_BOT_DE_SOPORTE>/setWebhook"
 
 Después de esto: cuando un cliente escribe en **Soporte**, te llega a Telegram. Si le das **"Responder"** (reply) a ese mensaje puntual y escribes, tu respuesta aparece en la app del cliente automáticamente. Un mensaje suelto (sin "Responder") no se puede vincular a nadie y se ignora — siempre usa "Responder".
 
-## 6. Poner tu APK de Android para descargar
+## 6. Sobre el botón de "obtener la app"
 
-Coloca el archivo en `public/prestapp.apk` (ese nombre exacto) antes de subir el repo, para que el botón "Descargar APK" del Navbar funcione.
+Ya no hay varios botones ni enlaces rotos. Ahora hay **un solo componente** (`GetAppButton`) que se usa tanto en el Navbar como en la portada, y decide solo qué mostrar:
 
-## 7. Instalar la web como app (PWA)
+1. Si el navegador (Android/Chrome) permite instalar la PWA, el botón dice **"Instalar App"** y la instala de verdad, ahí mismo, sin descargar ningún archivo — esto funciona siempre que tu web esté en HTTPS (Vercel ya lo da) y cumpla los requisitos de PWA (ya los cumple).
+2. Si además pones un `.apk` real en `public/prestapp.apk` (ver siguiente sección), el botón detecta que existe de verdad y dice **"Descargar APK"**.
+3. Si ninguna de las dos aplica todavía, muestra instrucciones para instalarla manualmente desde el menú de Chrome — nunca un botón que no hace nada.
 
-Ya viene lista: ícono de marca, `manifest.json`, pantalla completa sin barra de navegador, y funciona bien offline en lo básico. En un Android con Chrome, entra a tu dominio de Vercel y debería salir un banner para instalarla, o desde el menú ⋮ → "Instalar app".
+Antes, el botón apuntaba siempre a `/prestapp.apk` así el archivo no existiera; como Vercel no encontraba ese archivo, terminaba sirviendo el `index.html` de la propia web (por eso "descargaba un html"). Ya no puede volver a pasar.
 
-Si además quieres un `.apk` real generado a partir de esta misma web (para repartir o subir a Play Store): ve a **pwabuilder.com**, pega tu URL de Vercel, elige Android, y te genera el `.apk`/`.aab` firmado — no requiere tocar código.
+## 7. Si quieres el .apk real además de la instalación como PWA
+
+Coloca el archivo en `public/prestapp.apk` (ese nombre exacto) **antes de subir el repo**. El botón lo detecta automáticamente y empieza a ofrecer la descarga real. Si no tienes ese archivo todavía, no hace falta — la opción de "Instalar App" (PWA) ya deja a tus clientes con un ícono real en su pantalla de inicio, funcionando hoy mismo.
+
+Si además quieres generar ese `.apk` a partir de esta misma web: ve a **pwabuilder.com**, pega tu URL de Vercel, elige Android, y te da un `.apk`/`.aab` real y firmado — lo bajas y lo pones en `public/prestapp.apk`.
 
 ## 8. Qué puede hacer cada quien
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Download, User, LifeBuoy, UserCircle, LogOut } from 'lucide-react';
+import { Shield, User, LifeBuoy, UserCircle, LogOut } from 'lucide-react';
+import { GetAppButton } from './GetAppButton';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -60,14 +61,7 @@ export const Navbar: React.FC = () => {
               </button>
             </>
           ) : (
-            <a
-              href="/prestapp.apk"
-              download="PrestApp-Oficial.apk"
-              className="flex items-center space-x-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition shadow-md shadow-emerald-500/20"
-            >
-              <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Descargar APK</span>
-            </a>
+            <GetAppButton variant="compact" />
           )}
         </div>
       </div>
